@@ -25,14 +25,20 @@ def choose_option(options: list[dict], preferred: str | None, *, today: date | N
 	preferred = (preferred or "").strip().upper()
 	group = (
 		[option for option in valid if option.get("recommended")]
-		or [option for option in valid if preferred and (option.get("transporterCode") or "").upper() == preferred]
+		or [
+			option
+			for option in valid
+			if preferred and (option.get("transporterCode") or "").upper() == preferred
+		]
 		or valid
 	)
 	return min(group, key=_price)
 
 
 def _order_items(lines: list[dict]) -> list[dict]:
-	return [{"orderItemId": order_item_id, "quantity": qty} for order_item_id, qty in quantities(lines).items()]
+	return [
+		{"orderItemId": order_item_id, "quantity": qty} for order_item_id, qty in quantities(lines).items()
+	]
 
 
 def _expired(option: dict, today: date | None) -> bool:

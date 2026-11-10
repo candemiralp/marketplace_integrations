@@ -41,13 +41,17 @@ class TestChooseOption(unittest.TestCase):
 
 	def test_preferred_transporter_without_a_recommendation(self):
 		chosen = choose_option(
-			[option("a", "TNT_BRIEF", 2.0), option("b", "DHL", 5.0), option("c", "dhl", 4.5)], " dhl ", today=TODAY
+			[option("a", "TNT_BRIEF", 2.0), option("b", "DHL", 5.0), option("c", "dhl", 4.5)],
+			" dhl ",
+			today=TODAY,
 		)
 
 		self.assertEqual(chosen["shippingLabelOfferId"], "c")
 
 	def test_cheapest_without_recommendation_or_preference(self):
-		self.assertEqual(choose_option(options(recommended=False), None, today=TODAY)["shippingLabelOfferId"], MAILBOX)
+		self.assertEqual(
+			choose_option(options(recommended=False), None, today=TODAY)["shippingLabelOfferId"], MAILBOX
+		)
 
 	def test_cheapest_when_the_preferred_transporter_has_no_option(self):
 		chosen = choose_option(options(recommended=False), "DHL", today=TODAY)
