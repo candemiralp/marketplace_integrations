@@ -5,9 +5,8 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
+from marketplace_integrations.bol.permissions import check_bol_role
 from marketplace_integrations.bol.process_status import run_handler
-
-RETRY_ROLES = ("System Manager", "Bol Manager")
 
 
 class BolProcess(Document):
@@ -15,14 +14,10 @@ class BolProcess(Document):
 
 	@frappe.whitelist()
 	def retry_handler(self):
-		# Checked here, not with frappe.only_for, which lets everyone through in tests.
-		if set(RETRY_ROLES).isdisjoint(frappe.get_roles()):
-			frappe.throw(_("Only System Manager or Bol Manager can retry a handler."), frappe.PermissionError)
+		check_bol_role()
 		if self.status != "HANDLER_ERROR":
 			frappe.throw(_("Only a process whose handler failed can be retried."), title=_("Not Allowed"))
 		error = run_handler(self)
 		if error:
-			frappe.throw(
-				_("The handler failed again: {0}").format(error), title=_("Retry Failed")
-			)
+			frappe.throw(_("The handler failed again: {0}").format(str(error)), title=_("Retry Failed"))
 		return {"status": self.status}

@@ -10,6 +10,7 @@ from frappe.utils import add_to_date, get_datetime, now_datetime
 from marketplace_integrations.bol import process_status
 from marketplace_integrations.bol.api.errors import BolError, BolTransientError
 from marketplace_integrations.bol.process_status import DOCTYPE
+from marketplace_integrations.bol.tests.utils import discard_pending_logs
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BULK = json.loads((FIXTURES / "process_status_bulk.json").read_text())
@@ -49,7 +50,7 @@ class ProcessTestCase(FrappeTestCase):
 		# poll commits per row; keep the work in this transaction so the rollback below undoes it.
 		self._start(patch.object(frappe.db, "commit"))
 		self.addCleanup(frappe.db.rollback)
-		self.addCleanup(_discard_pending_logs)
+		self.addCleanup(discard_pending_logs)
 		for key in ("fetch", "ps-1", "ps-2"):
 			self.addCleanup(frappe.cache.delete_value, f"bol:failed:process_status:{key}")
 
@@ -386,7 +387,3 @@ class TestHousekeeping(ProcessTestCase):
 def _make_due(name: str):
 	past = add_to_date(now_datetime(), seconds=-1)
 	frappe.db.set_value(DOCTYPE, name, "next_check_at", past, update_modified=False)
-
-
-def _discard_pending_logs():
-	frappe.local.bol_pending_logs = None

@@ -37,10 +37,12 @@ def log_call(
 	error=None,
 	reference: tuple[str, str] | None = None,
 	safe: bool = False,
+	message: str | None = None,
 ):
 	"""Log a bol call. Failures are always logged; successes only for writes or with debug logging.
 
 	`safe` marks a call that changed nothing at bol even though it isn't a GET (a POST query).
+	`message` replaces the default one-line summary (e.g. for a job's result report).
 	"""
 	if error is None and not _log_success(method, safe):
 		return
@@ -52,7 +54,7 @@ def log_call(
 			"integration": INTEGRATION,
 			"status": "Error" if error else "Success",
 			"method": " ".join(str(part) for part in (method, path) if part),
-			"message": f"{type(error).__name__}: {error}" if error else f"{method} {path} → {status}",
+			"message": message or _default_message(method, path, status, error),
 			"request_data": _dump(request),
 			"response_data": _dump(response),
 			"traceback": "".join(traceback.format_exception(error)) if error else None,
@@ -78,6 +80,10 @@ def add_comment(reference: tuple[str, str] | None, text: str):
 	if not (doctype and name and frappe.db.exists(doctype, name)):
 		return
 	frappe.get_doc(doctype, name).add_comment("Comment", text)
+
+
+def _default_message(method, path, status, error) -> str:
+	return f"{type(error).__name__}: {error}" if error else f"{method} {path} → {status}"
 
 
 def _log_success(method, safe) -> bool:

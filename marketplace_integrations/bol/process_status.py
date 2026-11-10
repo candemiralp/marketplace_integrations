@@ -120,7 +120,7 @@ def run_handler(doc) -> Exception | None:
 			error=e,
 			reference=_reference(doc),
 		)
-		message = _("bol {0} handler failed: {1}").format(_label(doc), e)
+		message = _("bol {0} handler failed: {1}").format(_label(doc), str(e))
 		add_comment(_reference(doc), message)
 		doc.add_comment("Comment", message)
 		return e

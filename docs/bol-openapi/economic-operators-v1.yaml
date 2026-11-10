@@ -1,0 +1,337 @@
+openapi: "3.0.1"
+info:
+  title: "Economic Operator API - V1"
+  description: "Economic Operator endpoints"
+  version: 1.1.1
+tags:
+  - name: "Management"
+    description: "Endpoints dedicated to managing economic operators, including functionalities to create, read, update, and delete records."
+  - name: "Query"
+    description: "Endpoints designed for querying economic operators, enabling the retrieval of records based on specified path or query parameters."
+paths:
+  /retailer/economic-operator:
+    post:
+      summary: "Create a new economic operator."
+      description: "This endpoint allows for the creation of a new economic operator associated with a retailer. It accepts relevant details about the operator and stores them in the system."
+      operationId: "create-economic-operator"
+      x-bol-scopes:
+        - retailer
+        - economic-operators.manage
+      tags:
+        - "Management"
+      requestBody:
+        description: "The request body for this endpoint is required to create a new economic operator associated with a retailer. It must be provided in JSON format and adhere to the specified schema."
+        content:
+          application/vnd.economic-operator.v1+json:
+            schema:
+              $ref: "#/components/schemas/CreateEconomicOperator"
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/200_CRUD_SUCCESSFUL"
+        "400":
+          $ref: '../common/responses.yaml#/components/responses/400'
+        "403":
+          $ref: '../common/responses.yaml#/components/responses/403'
+        "409":
+          $ref: '../common/responses.yaml#/components/responses/409'
+        "500":
+          $ref: '../common/responses.yaml#/components/responses/500'
+        "503":
+          $ref: '../common/responses.yaml#/components/responses/503'
+        "504":
+          $ref: '../common/responses.yaml#/components/responses/504'
+  /retailer/economic-operator/{id}:
+    put:
+      summary: "Update a specific economic operator associated with a retailer"
+      description: "This endpoint allows for updating the details of a specific economic operator linked to a retailer. It requires the identification of the operator to be updated and the necessary data for modification."
+      operationId: "update-economic-operator"
+      x-bol-scopes:
+        - retailer
+        - economic-operators.manage
+      tags:
+        - "Management"
+      parameters:
+        - name: "id"
+          in: "path"
+          description: "Unique identifier for an economic operator that is to be updated. This ID is used to pinpoint the exact economic operator that needs to be modified with the new details provided in the request."
+          required: true
+          schema:
+            $ref: "../common/models.yaml#/components/schemas/economicOperatorId"
+      requestBody:
+        description: "The request body for this PUT endpoint is required to update an existing economic operator associated with a retailer. It must include the necessary data for the update, provided in JSON format, and adhere to the specified schema."
+        content:
+          application/vnd.economic-operator.v1+json:
+            schema:
+              $ref: "#/components/schemas/UpdateEconomicOperator"
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/200_CRUD_SUCCESSFUL"
+        "400":
+          $ref: '../common/responses.yaml#/components/responses/400'
+        "403":
+          $ref: '../common/responses.yaml#/components/responses/403'
+        "404":
+          $ref: "../common/responses.yaml#/components/responses/404"
+        "409":
+          $ref: '../common/responses.yaml#/components/responses/409'
+        "500":
+          $ref: '../common/responses.yaml#/components/responses/500'
+        "503":
+          $ref: '../common/responses.yaml#/components/responses/503'
+        "504":
+          $ref: '../common/responses.yaml#/components/responses/504'
+    get:
+      summary: "Retrieve a specific economic operator associated with a retailer"
+      description: "This endpoint allows you to retrieve detailed information about a single economic operator linked to a specific retailer. It requires identifying the operator you wish to retrieve."
+      operationId: "get-single-economic-operator"
+      x-bol-scopes:
+        - retailer
+        - economic-operators.manage
+        - economic-operators.read
+      tags:
+        - "Management"
+      parameters:
+        - name: "id"
+          in: "path"
+          description: "Unique identifier for an economic operator being retrieved. This ID enables the fetching of detailed information about a particular economic operator."
+          required: true
+          schema:
+            $ref: "../common/models.yaml#/components/schemas/economicOperatorId"
+      responses:
+        "200":
+          $ref: "#/components/responses/200_GET_SUCCESSFUL"
+        "400":
+          $ref: '../common/responses.yaml#/components/responses/400'
+        "403":
+          $ref: '../common/responses.yaml#/components/responses/403'
+        "404":
+          $ref: "../common/responses.yaml#/components/responses/404"
+        "500":
+          $ref: '../common/responses.yaml#/components/responses/500'
+        "503":
+          $ref: '../common/responses.yaml#/components/responses/503'
+        "504":
+          $ref: '../common/responses.yaml#/components/responses/504'
+    delete:
+      summary: "Delete a specific economic operator associated with a retailer"
+      description: "This endpoint allows for the deletion of a specific economic operator linked to a retailer. It requires identifying the operator that needs to be removed from the system."
+      operationId: "delete-economic-operator"
+      x-bol-scopes:
+        - retailer
+        - economic-operators.manage
+      tags:
+        - "Management"
+      parameters:
+        - name: "id"
+          in: "path"
+          description: "Unique identifier for an economic operator that is to be deleted. This ID is used to pinpoint the exact economic operator that needs to be removed from the retailer's list of economic operators."
+          required: true
+          schema:
+            $ref: "../common/models.yaml#/components/schemas/economicOperatorId"
+      responses:
+        "200":
+          $ref: "#/components/responses/200_CRUD_SUCCESSFUL"
+        "400":
+          $ref: '../common/responses.yaml#/components/responses/400'
+        "403":
+          $ref: '../common/responses.yaml#/components/responses/403'
+        "404":
+          $ref: "../common/responses.yaml#/components/responses/404"
+        "500":
+          $ref: '../common/responses.yaml#/components/responses/500'
+        "503":
+          $ref: '../common/responses.yaml#/components/responses/503'
+        "504":
+          $ref: '../common/responses.yaml#/components/responses/504'
+  /retailer/economic-operators:
+    get:
+      summary: "Retrieve economic operators based on partial match search on a name"
+      description: "This endpoint allows you to retrieve detailed information about economic operators that correspond to a partial match search on name"
+      operationId: "get-all-economic-operators"
+      x-bol-scopes:
+        - retailer
+        - economic-operators.manage
+        - economic-operators.read
+      tags:
+        - "Query"
+      parameters:
+        - name: "name"
+          in: "query"
+          description: "Name or partial name of an economic operator. This name enables the partial match searching on economic operators."
+          required: false
+          schema:
+            $ref: "#/components/schemas/name"
+        - name: "page"
+          in: "query"
+          schema:
+            $ref: "../common/models.yaml#/components/schemas/pageNumber"
+        - name: "page-size"
+          in: "query"
+          schema:
+            $ref: "../common/models.yaml#/components/schemas/pageSize"
+      responses:
+        "200":
+          description: "The request was successfully processed, returning a paginated list of economic operators."
+          content:
+            application/vnd.economic-operator.v1+json:
+              schema:
+                $ref: "#/components/schemas/EconomicOperatorsPage"
+        "400":
+          $ref: '../common/responses.yaml#/components/responses/400'
+        "403":
+          $ref: '../common/responses.yaml#/components/responses/403'
+        "404":
+          $ref: "../common/responses.yaml#/components/responses/404"
+        "500":
+          $ref: '../common/responses.yaml#/components/responses/500'
+        "503":
+          $ref: '../common/responses.yaml#/components/responses/503'
+        "504":
+          $ref: '../common/responses.yaml#/components/responses/504'
+components:
+  responses:
+    "200_GET_SUCCESSFUL":
+      description: "The request was successful, and the economic operator's details have been retrieved successfully."
+      content:
+        application/vnd.economic-operator.v1+json:
+          schema:
+            $ref: "#/components/schemas/EconomicOperator"
+    "200_CRUD_SUCCESSFUL":
+      description: "The request was successful, and the economic operator has been created, updated, or deleted successfully."
+      content:
+        application/vnd.economic-operator.v1+json:
+          schema:
+            $ref: "#/components/schemas/EconomicOperator"
+  schemas:
+    EconomicOperatorsPage:
+      description: "Represents a paginated list of economic operators, including pagination metadata."
+      required:
+        - "operators"
+        - "page"
+      properties:
+        operators:
+          type: "array"
+          nullable: false
+          description: "List of economic operators on the current page."
+          items:
+            $ref: "#/components/schemas/EconomicOperator"
+        page:
+          $ref: "../common/models.yaml#/components/schemas/page"
+    address:
+      description: "Specifies the full legal address, including street, house number, postal code, city, and country."
+      type: "object"
+      required:
+        - "street"
+        - "houseNumber"
+        - "postalCode"
+        - "city"
+        - "country"
+      properties:
+        street:
+          $ref: "../common/models.yaml#/components/schemas/street"
+        houseNumber:
+          $ref: "../common/models.yaml#/components/schemas/houseNumber"
+        additionalAddressInfo:
+          $ref: "../common/models.yaml#/components/schemas/additionalAddressInfo"
+        postalCode:
+          $ref: "../common/models.yaml#/components/schemas/postalCode"
+        city:
+          $ref: "../common/models.yaml#/components/schemas/city"
+        country:
+          $ref: "../common/models.yaml#/components/schemas/countries"
+    EconomicOperators:
+      description: "Represents detailed information about one or more economic operators."
+      required:
+        - "operators"
+      properties:
+        operators:
+          type: "array"
+          nullable: true
+          description: "A list containing detailed information about economic operators."
+          items:
+            $ref: "#/components/schemas/EconomicOperator"
+    externalReference:
+      description: "The reference for economic operator as it is known by the retailer."
+      type: "string"
+      nullable: true
+      maxLength: 100
+      example: "external-reference"
+    contactInformation:
+      description: "Represents the contact information of economic operator such as phone number and email"
+      type: "object"
+      required:
+        - "phoneNumber"
+        - "emailAddress"
+      properties:
+        emailAddress:
+          $ref: "../common/models.yaml#/components/schemas/emailAddress"
+        phoneNumber:
+          $ref: "../common/models.yaml#/components/schemas/phoneNumber"
+    name:
+      description: "Represents the legal name of the economic operator."
+      type: "string"
+      maxLength: 100
+      example: "John"
+    UpdateEconomicOperator:
+      description: "Represents the data structure for updating an existing economic operator, identified by the provided operator ID and retailer ID."
+      required:
+        - "name"
+        - "address"
+        - "contactInformation"
+      properties:
+        externalReference:
+          $ref: "#/components/schemas/externalReference"
+        name:
+          $ref: "#/components/schemas/name"
+        address:
+          $ref: "#/components/schemas/address"
+        contactInformation:
+          $ref: "#/components/schemas/contactInformation"
+    EconomicOperator:
+      type: "object"
+      description: "Represents the details of an economic operator identified by the provided ID."
+      required:
+        - "id"
+        - "name"
+        - "address"
+        - "contactInformation"
+      properties:
+        id:
+          $ref: "../common/models.yaml#/components/schemas/economicOperatorId"
+        externalReference:
+          $ref: "#/components/schemas/externalReference"
+        name:
+          $ref: "#/components/schemas/name"
+        address:
+          $ref: "#/components/schemas/address"
+        contactInformation:
+          $ref: "#/components/schemas/contactInformation"
+        status:
+          $ref: "#/components/schemas/status"
+    CreateEconomicOperator:
+      type: "object"
+      description: "Represents the data structure required to create a new economic operator compliant with the Digital Services Act."
+      required:
+        - "name"
+        - "address"
+        - "contactInformation"
+      properties:
+        externalReference:
+          $ref: "#/components/schemas/externalReference"
+        name:
+          $ref: "#/components/schemas/name"
+        address:
+          $ref: "#/components/schemas/address"
+        contactInformation:
+          $ref: "#/components/schemas/contactInformation"
+    status:
+      description: "Represents whether economic operator is valid"
+      type: "string"
+      nullable: false
+      enum:
+        - "PENDING"
+        - "VALID"
+        - "INVALID"
+      example: "VALID"

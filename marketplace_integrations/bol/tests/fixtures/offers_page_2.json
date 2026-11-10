@@ -1,0 +1,20 @@
+{
+	"offers": [
+		{
+			"offerId": "b2c3d4e5-0000-4150-8c67-78269ee986f7",
+			"ean": "0012345678905",
+			"lastModifiedDateTime": "2025-08-19T12:36:00+02:00",
+			"reference": "AX1236",
+			"onHoldByRetailer": false,
+			"stock": {"amount": 0, "correctedStock": 0, "managedByRetailer": false},
+			"countryAvailabilities": [
+				{"countryCode": "NL", "forSale": false},
+				{"countryCode": "BE", "forSale": false}
+			],
+			"condition": {"category": "NEW"},
+			"pricing": {"bundlePrices": [{"quantity": 1, "unitPrice": 24.5}]},
+			"fulfilment": {"method": "FBR", "deliveryPromise": {"minimumDaysToCustomer": 1, "maximumDaysToCustomer": 3}}
+		}
+	],
+	"page": {"pageSize": 2, "nextCursor": null}
+}

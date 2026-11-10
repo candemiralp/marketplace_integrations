@@ -4,11 +4,14 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import cint
 
 from marketplace_integrations.bol.api.auth import invalidate_token
 from marketplace_integrations.bol.api.client import BolClient
 from marketplace_integrations.bol.api.errors import BolAuthError, BolError
 from marketplace_integrations.bol.log import log_call
+from marketplace_integrations.bol.offers import enqueue_adoption
+from marketplace_integrations.bol.permissions import check_bol_role
 
 REQUIRED_WHEN_ENABLED = ("client_id", "client_secret", "company")
 
@@ -17,6 +20,7 @@ class BolSettings(Document):
 	# Saving never calls bol; only the Test Connection button does.
 
 	def validate(self):
+		self.validate_delivery_days()
 		if not self.enabled:
 			return
 		missing = [_(self.meta.get_label(field)) for field in REQUIRED_WHEN_ENABLED if not self.get(field)]
@@ -24,6 +28,17 @@ class BolSettings(Document):
 			frappe.throw(
 				_("Set {0} before enabling the bol integration.").format(", ".join(missing)),
 				title=_("Missing Settings"),
+			)
+
+	def validate_delivery_days(self):
+		min_days, max_days = cint(self.default_min_days), cint(self.default_max_days)
+		if min_days < 0 or max_days < 0:
+			frappe.throw(_("Delivery days can't be negative."))
+		if max_days and min_days > max_days:
+			frappe.throw(
+				_(
+					"Default Min Days to Customer ({0}) can't be more than Default Max Days to Customer ({1})."
+				).format(min_days, max_days)
 			)
 
 	def on_update(self):
@@ -46,3 +61,11 @@ class BolSettings(Document):
 			log_call(**e.details, error=e, reference=(self.doctype, self.name))
 			frappe.throw(_("Connection to bol failed: {0}").format(str(e)), title=_("Connection Failed"))
 		return {"ok": True}
+
+	@frappe.whitelist()
+	def adopt_existing_offers(self):
+		"""Queue the job that maps bol's existing offers to Items (it never creates offers)."""
+		check_bol_role()
+		if not self.enabled:
+			frappe.throw(_("Enable the bol integration first."), title=_("bol Disabled"))
+		return {"queued": enqueue_adoption()}

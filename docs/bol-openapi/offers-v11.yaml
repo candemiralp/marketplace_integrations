@@ -1,0 +1,954 @@
+openapi: 3.0.1
+info:
+  title: Offers API
+  description: The API for the offer resource
+  termsOfService: https://api.bol.com/retailer/public/Retailer-API/legal/terms-of-service.html
+  contact:
+    name: developers.bol.com
+    url: https://developers.bol.com
+  version: 11.5.0
+  x-logo:
+    url: https://api.bol.com/retailer/public/Retailer-API/_images/bolcom_logo.png
+    altText: bol. logo
+security:
+  - OAuth2: []
+tags:
+  - name: Offers
+paths:
+  /retailer/offers:
+    get:
+      tags:
+        - Offers
+      operationId: get-offers
+      x-bol-scopes:
+        - retailer
+        - offers.read
+        - offers.manage
+      summary: Get offers
+      parameters:
+        - name: offer-ids
+          in: query
+          description: List of offer ids to search for.
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: eans
+          in: query
+          description: List of eans to search for
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: reference
+          in: query
+          schema:
+            type: string
+          required: false
+          description: Filter offers by reference.
+        - name: for-sale
+          in: query
+          description: Filter offers based on whether they are for sale.
+          required: false
+          schema:
+            type: boolean
+            default: null
+        - name: last-modified-date-time
+          in: query
+          schema:
+            type: string
+            format: date-time
+            example: 2018-11-14T08:34:41Z
+          required: false
+          description: Filter offers updated since the specified date-time. The timestamp should be in ISO 8601 format (UTC).
+        - name: page-size
+          in: query
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            description: Number of offers per page.
+          required: false
+          description: The number of offers per page.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            description: Cursor token used to retrieve the next page of results.
+          required: false
+          description: Cursor token used to retrieve the next page of results.
+      responses:
+        '200':
+          description: The request was successfully processed, returning a paginated list of offers.
+          content:
+            application/vnd.retailer.v11+json:
+              schema:
+                $ref: '#/components/schemas/OfferListResponse'
+        '400':
+          $ref: '../common/responses.yaml#/components/responses/400_BAD_REQUEST'
+        '500':
+          $ref: '../common/responses.yaml#/components/responses/500_INTERNAL_SERVER_ERROR'
+        '503':
+          $ref: '../common/responses.yaml#/components/responses/503_SERVICE_UNAVAILABLE'
+        '504':
+          $ref: '../common/responses.yaml#/components/responses/504_GATEWAY_TIMEOUT'
+    post:
+      tags:
+        - Offers
+      operationId: create-offer
+      x-bol-scopes:
+        - retailer
+        - offers.manage
+      summary: Create a new offer
+      requestBody:
+        content:
+          application/vnd.retailer.v11+json:
+            schema:
+              $ref: '#/components/schemas/CreateOfferRequest'
+        required: true
+      responses:
+        '201':
+          description: Offer is created
+          content:
+            application/vnd.retailer.v11+json:
+              schema:
+                $ref: '#/components/schemas/RetailerOffer'
+        '400':
+          $ref: '../common/responses.yaml#/components/responses/400_BAD_REQUEST'
+        '409':
+          $ref: '../common/responses.yaml#/components/responses/409_CONFLICT'
+        '500':
+          $ref: '../common/responses.yaml#/components/responses/500_INTERNAL_SERVER_ERROR'
+        '503':
+          $ref: '../common/responses.yaml#/components/responses/503_SERVICE_UNAVAILABLE'
+        '504':
+          $ref: '../common/responses.yaml#/components/responses/504_GATEWAY_TIMEOUT'
+  /retailer/offers/{offer-id}:
+    get:
+      tags:
+        - Offers
+      operationId: get-offer
+      x-bol-scopes:
+        - retailer
+        - offers.read
+        - offers.manage
+      summary: Get an offer by offer id
+      parameters:
+        - in: path
+          name: offer-id
+          required: true
+          description: The unique identifier of the offer.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The offer was successfully retrieved.
+          content:
+            application/vnd.retailer.v11+json:
+              schema:
+                $ref: '#/components/schemas/OfferResponse'
+        '400':
+          $ref: '../common/responses.yaml#/components/responses/400_BAD_REQUEST'
+        '404':
+          $ref: '../common/responses.yaml#/components/responses/404_NOT_FOUND'
+        '500':
+          $ref: '../common/responses.yaml#/components/responses/500_INTERNAL_SERVER_ERROR'
+        '503':
+          $ref: '../common/responses.yaml#/components/responses/503_SERVICE_UNAVAILABLE'
+        '504':
+          $ref: '../common/responses.yaml#/components/responses/504_GATEWAY_TIMEOUT'
+    delete:
+      tags:
+        - Offers
+      summary: Delete offer by id
+      operationId: delete-offer
+      x-bol-scopes:
+        - retailer
+        - offers.manage
+      parameters:
+        - name: offer-id
+          in: path
+          required: true
+          description: The unique identifier of the offer to be deleted.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Offer was deleted successfully.
+          content:
+            application/vnd.retailer.v11+json: {}
+        '400':
+          $ref: '../common/responses.yaml#/components/responses/400_BAD_REQUEST'
+        '500':
+          $ref: '../common/responses.yaml#/components/responses/500_INTERNAL_SERVER_ERROR'
+        '503':
+          $ref: '../common/responses.yaml#/components/responses/503_SERVICE_UNAVAILABLE'
+        '504':
+          $ref: '../common/responses.yaml#/components/responses/504_GATEWAY_TIMEOUT'
+    patch:
+      tags:
+        - Offers
+      summary: Update an offer
+      operationId: update-offer
+      x-bol-scopes:
+        - retailer
+        - offers.manage
+      parameters:
+        - name: offer-id
+          in: path
+          required: true
+          description: The unique identifier of the offer to be updated.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/vnd.retailer.v11+json:
+            schema:
+              $ref: '#/components/schemas/PatchOfferRequest'
+      responses:
+        '204':
+          description: Offer was updated successfully.
+          content:
+            application/vnd.retailer.v11+json: {}
+        '400':
+          $ref: '../common/responses.yaml#/components/responses/400_BAD_REQUEST'
+        '409':
+          $ref: '../common/responses.yaml#/components/responses/409_CONFLICT'
+        '500':
+          $ref: '../common/responses.yaml#/components/responses/500_INTERNAL_SERVER_ERROR'
+        '503':
+          $ref: '../common/responses.yaml#/components/responses/503_SERVICE_UNAVAILABLE'
+        '504':
+          $ref: '../common/responses.yaml#/components/responses/504_GATEWAY_TIMEOUT'
+  /retailer/offers/{offer-id}/not-for-sale-reasons:
+    get:
+      tags:
+        - Offers
+      operationId: get-not-for-sale-reasons
+      x-bol-scopes:
+        - retailer
+        - offers.read
+        - offers.manage
+      summary: Get not for sale reasons for an offer by offer id
+      parameters:
+        - in: path
+          name: offer-id
+          required: true
+          description: The unique identifier of the offer.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The request was successfully processed, returning offer feedbacks.
+          content:
+            application/vnd.retailer.v11+json:
+              schema:
+                $ref: '#/components/schemas/NotForSaleReasons'
+              example:
+                offerId: '123456789'
+                countries:
+                  - countryCode: NL
+                    reasons:
+                      - category: PRICE
+                        code: 4000-1
+                        description: Price too high
+        '400':
+          $ref: '../common/responses.yaml#/components/responses/400_BAD_REQUEST'
+        '500':
+          $ref: '../common/responses.yaml#/components/responses/500_INTERNAL_SERVER_ERROR'
+        '503':
+          $ref: '../common/responses.yaml#/components/responses/503_SERVICE_UNAVAILABLE'
+        '504':
+          $ref: '../common/responses.yaml#/components/responses/504_GATEWAY_TIMEOUT'
+components:
+  schemas:
+    RetailerOffer:
+      type: object
+      properties:
+        offerId:
+          type: string
+          format: uuid
+          description: A globally unique identifier assigned to each offer,
+            used for tracking and referencing within the system.
+          example: 6ff736b5-cdd0-4150-8c67-78269ee986f5
+    PatchOfferRequest:
+      type: object
+      properties:
+        unknownProductTitle:
+          minLength: 0
+          maxLength: 500
+          type: string
+          description: If the product is not recognized by bol, the retailer may
+            use this field to provide a custom title for identification. Note that, in case the product
+            is known to bol, the unknown product title will not be stored.
+          example: unknown title
+        economicOperatorId:
+          type: string
+          description: An identifier referring to the Economic operator entity (manufacturer,
+            authorized party, importer, distributor or other natural person or legal
+            entity for whom the obligations apply with regards to the manufacturing,
+            or making available on the market of the product in line with the applicable
+            EU laws.
+          example: 0c6573a2-a80c-48b7-a03e-d5939f1173fa
+        onHoldByRetailer:
+          type: boolean
+          default: false
+          description: Specifies whether the offer should be listed for sale on bol.
+            Useful for temporarily suspending visibility without deletion.
+          example: true
+        reference:
+          minLength: 0
+          maxLength: 100
+          type: string
+          description: A custom reference string defined by the retailer to help identify
+            and correlate the offer with internal systems.
+          example: AX1234
+        countryAvailabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateCountryAvailability'
+        pricing:
+          $ref: '#/components/schemas/Pricing'
+        fulfilment:
+          $ref: '#/components/schemas/Fulfilment'
+        stock:
+          $ref: '#/components/schemas/UpdateStock'
+    CreateOfferRequest:
+      required:
+        - condition
+        - pricing
+        - ean
+        - fulfilment
+      type: object
+      properties:
+        ean:
+          type: string
+          description: The European Article Number (EAN) uniquely identifying the
+            product, used for inventory and cataloging purposes. Note that in case
+            an ISBN is provided, it will be replaced with the actual EAN belonging
+            to this ISBN.
+          example: '0000007740404'
+        unknownProductTitle:
+          minLength: 0
+          maxLength: 500
+          type: string
+          description: If the product is not recognized by bol, the retailer may
+            use this field to provide a custom title for identification. Note that, in case the product
+            is known to bol, the unknown product title will not be stored.
+          example: unknown title
+        economicOperatorId:
+          type: string
+          description: An identifier referring to the Economic operator entity (manufacturer,
+            authorized party, importer, distributor or other natural person or legal
+            entity for whom the obligations apply with regards to the manufacturing,
+            or making available on the market of the product in line with the applicable
+            EU laws.
+          example: 0c6573a2-a80c-48b7-a03e-d5929f1173ff
+        reference:
+          minLength: 0
+          maxLength: 100
+          type: string
+          description: A custom reference string defined by the retailer to help identify
+            and correlate the offer with internal systems.
+          example: AX1234
+        onHoldByRetailer:
+          type: boolean
+          default: false
+          description: Specifies whether the offer should be listed for sale on bol.
+            Useful for temporarily suspending visibility without deletion.
+          example: true
+        condition:
+          $ref: '#/components/schemas/Condition'
+        pricing:
+          $ref: '#/components/schemas/Pricing'
+        countryAvailabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateCountryAvailability'
+        fulfilment:
+          $ref: '#/components/schemas/Fulfilment'
+        stock:
+          $ref: '#/components/schemas/CreateStock'
+    CreateStock:
+      type: object
+      required:
+        - amount
+        - managedByRetailer
+      properties:
+        amount:
+          type: integer
+          format: int32
+          description: The quantity of the product currently available in the retailer's
+            warehouse for fulfillment.
+          default: 0
+        managedByRetailer:
+          type: boolean
+          description: Configures whether the retailer manages the stock levels or
+            that bol should calculate the corrected stock based on actual open orders.
+            In case the configuration is set to 'false', all open orders are used
+            to calculate the corrected stock. In case the configuration is set to
+            true, only orders that are placed after the last offer update are taken
+            into account.
+    UpdateStock:
+      type: object
+      properties:
+        amount:
+          type: integer
+          format: int32
+          description: The quantity of the product currently available in the retailer's
+            warehouse for fulfillment.
+        managedByRetailer:
+          type: boolean
+          description: Configures whether the retailer manages the stock levels or
+            that bol should calculate the corrected stock based on actual open orders.
+            In case the configuration is set to 'false', all open orders are used
+            to calculate the corrected stock. In case the configuration is set to
+            true, only orders that are placed after the last offer update are taken
+            into account.
+    Page:
+      type: object
+      properties:
+        pageSize:
+          $ref: '#/components/schemas/PageSize'
+        nextCursor:
+          $ref: '#/components/schemas/Cursor'
+    PageSize:
+      nullable: true
+      format: int32
+      minimum: 25
+      maximum: 100
+      description: Number of items per page, with a maximum limit of 100
+      type: integer
+      example: 25
+    Cursor:
+      description: Cursor token used to retrieve the next page of results
+      type: string
+      nullable: true
+      example: eyJpZCI6MTA1LCJjcmVhdGVkIjoiMjAyNS0wOC0xOVQxMjozNDo1NloifQ==,
+    OfferListResponse:
+      type: object
+      required:
+        - offers
+        - page
+      properties:
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OfferResponse'
+        page:
+          $ref: '#/components/schemas/Page'
+    OfferResponse:
+      required:
+        - offerId
+        - lastModifiedDateTime
+        - onHoldByRetailer
+        - condition
+        - pricing
+        - fulfilment
+      properties:
+        offerId:
+          type: string
+          format: uuid
+          description: A globally unique identifier assigned to each offer,
+            used for tracking and referencing within the system.
+          example: 6ff736b5-cdd0-4150-8c67-78269ee986f5
+        ean:
+          type: string
+          description: The European Article Number (EAN) uniquely identifying the
+            product, used for inventory and cataloging purposes. Note that in case
+            an ISBN is provided, it will be replaced with the actual EAN belonging
+            to this ISBN.
+          example: '0000007740404'
+        lastModifiedDateTime:
+          type: string
+          description: The date time this offer was last modified by either bol or the partner itself.
+        reference:
+          minLength: 0
+          maxLength: 100
+          type: string
+          description: A custom reference string defined by the retailer to help identify
+            and correlate the offer with internal systems.
+          example: AX1234
+        onHoldByRetailer:
+          type: boolean
+          description: Specifies whether the offer should be listed for sale on bol.
+            Useful for temporarily suspending visibility without deletion.
+          default: false
+        economicOperatorId:
+          type: string
+          description: An identifier referring to the Economic operator entity (manufacturer,
+            authorized party, importer, distributor or other natural person or legal
+            entity for whom the obligations apply with regards to the manufacturing,
+            or making available on the market of the product in line with the applicable
+            EU laws.
+          example: 0c6573a2-a80c-48b7-a03e-d5939f1173fa
+        unknownProductTitle:
+          minLength: 0
+          maxLength: 500
+          type: string
+          description: If the product is not recognized by bol, the retailer may
+            use this field to provide a custom title for identification. Note that, in case the product
+            is known to bol, the unknown product title will not be stored.
+        stock:
+          $ref: '#/components/schemas/Stock'
+        countryAvailabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CountryAvailability'
+        condition:
+          $ref: '#/components/schemas/Condition'
+        product:
+          $ref: '#/components/schemas/Product'
+        pricing:
+          $ref: '#/components/schemas/Pricing'
+        fulfilment:
+          $ref: '#/components/schemas/Fulfilment'
+    NotForSaleReasons:
+      type: object
+      required:
+        - offerId
+      properties:
+        offerId:
+          type: string
+          format: uuid
+          description: The unique identifier of the offer.
+        countries:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotForSaleReasonsCountry'
+    NotForSaleReasonsCountry:
+      type: object
+      required:
+        - countryCode
+      properties:
+        countryCode:
+          $ref: '#/components/schemas/CountryCode'
+        reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reason'
+    Reason:
+      oneOf:
+        - $ref: '#/components/schemas/ContentReason'
+        - $ref: '#/components/schemas/PricingReason'
+        - $ref: '#/components/schemas/StockReason'
+        - $ref: '#/components/schemas/ShopStatusReason'
+        - $ref: '#/components/schemas/SellingRightsReason'
+        - $ref: '#/components/schemas/AccountRightsReason'
+        - $ref: '#/components/schemas/OnHoldReason'
+        - $ref: '#/components/schemas/AssortmentPolicyReason'
+        - $ref: '#/components/schemas/OfferReason'
+      discriminator:
+        propertyName: category
+        mapping:
+          CONTENT: '#/components/schemas/ContentReason'
+          PRICE: '#/components/schemas/PricingReason'
+          STOCK: '#/components/schemas/StockReason'
+          SHOP_STATUS: '#/components/schemas/ShopStatusReason'
+          SELLING_RIGHTS: '#/components/schemas/SellingRightsReason'
+          ACCOUNT_RIGHTS: '#/components/schemas/AccountRightsReason'
+          ON_HOLD: '#/components/schemas/OnHoldReason'
+          ASSORTMENT_POLICY: '#/components/schemas/AssortmentPolicyReason'
+          OFFER: '#/components/schemas/OfferReason'
+    ReasonCategory:
+      type: string
+      enum:
+        - CONTENT
+        - PRICE
+        - STOCK
+        - SHOP_STATUS
+        - SELLING_RIGHTS
+        - ACCOUNT_RIGHTS
+        - ON_HOLD
+        - ASSORTMENT_POLICY
+        - OFFER
+    ContentReason:
+      type: object
+      required:
+        - category
+        - code
+        - description
+      properties:
+        category:
+          $ref: '#/components/schemas/ReasonCategory'
+        code:
+          type: string
+          example: "4004-2"
+          description: Unique reason code
+        description:
+          type: string
+          example: "For this product essential product information is missing"
+          description: A description explaining the reason why this offer is marked as offline.
+        missingAttributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissingAttribute'
+    MissingAttribute:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "Title"
+          description: "Name of the attribute that is missing"
+
+    PricingReason:
+      type: object
+      required:
+        - category
+        - code
+        - description
+      properties:
+        category:
+          $ref: '#/components/schemas/ReasonCategory'
+        code:
+          type: string
+          example: "4000-1"
+          description: Unique reason code
+        description:
+          type: string
+          example: "Price too high"
+          description: A description explaining the reason why this offer is marked as offline.
+
+    StockReason:
+      type: object
+      required:
+        - category
+        - code
+        - description
+      properties:
+        category:
+          $ref: '#/components/schemas/ReasonCategory'
+        code:
+          type: string
+          example: "4003-3"
+          description: Unique reason code
+        description:
+          type: string
+          example: "Out of stock or remaining stock is reserved for pending orders."
+          description: A description explaining the reason why this offer is marked as offline.
+
+    ShopStatusReason:
+      type: object
+      required:
+        - category
+        - code
+        - description
+      properties:
+        category:
+          $ref: '#/components/schemas/ReasonCategory'
+        code:
+          type: string
+          example: "4003-2"
+          description: Unique reason code
+        description:
+          type: string
+          example: "The seller is on holiday"
+          description: A description explaining the reason why this offer is marked as offline.
+
+    SellingRightsReason:
+      type: object
+      required:
+        - category
+        - code
+        - description
+      properties:
+        category:
+          $ref: '#/components/schemas/ReasonCategory'
+        code:
+          type: string
+          example: "3001-39"
+          description: Unique reason code
+        description:
+          type: string
+          example: "Selling rights missing for category foods"
+          description: A description explaining the reason why this offer is marked as offline.
+
+    AccountRightsReason:
+      type: object
+      required:
+        - category
+        - code
+        - description
+      properties:
+        category:
+          $ref: '#/components/schemas/ReasonCategory'
+        code:
+          type: string
+          example: "5002-1"
+          description: Unique reason code
+        description:
+          type: string
+          example: "Fulfilment By bol not allowed"
+          description: A description explaining the reason why this offer is marked as offline.
+
+    OnHoldReason:
+      type: object
+      required:
+        - category
+        - code
+        - description
+      properties:
+        category:
+          $ref: '#/components/schemas/ReasonCategory'
+        code:
+          type: string
+          example: "4003-1"
+          description: Unique reason code
+        description:
+          type: string
+          example: "The seller has not marked the offer for-sale"
+          description: A description explaining the reason why this offer is marked as offline.
+
+    AssortmentPolicyReason:
+      type: object
+      required:
+        - category
+        - code
+        - description
+      properties:
+        category:
+          $ref: '#/components/schemas/ReasonCategory'
+        code:
+          type: string
+          example: "3001-99"
+          description: Unique reason code
+        description:
+          type: string
+          example: "Offline due to incomplete economic operator"
+          description: A description explaining the reason why this offer is marked as offline.
+
+    OfferReason:
+      type: object
+      required:
+        - category
+        - code
+        - description
+      properties:
+        category:
+          $ref: '#/components/schemas/ReasonCategory'
+        code:
+          type: string
+          example: "4004-10"
+          description: Unique reason code
+        description:
+          type: string
+          example: "The offer is expired"
+          description: A description explaining the reason why this offer is marked as offline.
+
+    Pricing:
+      type: object
+      required:
+        - bundlePrices
+      properties:
+        bundlePrices:
+          type: array
+          description: A set of prices (containing a quantity and selling price) that
+            apply to this offer.
+          items:
+            type: object
+            required:
+              - quantity
+              - unitPrice
+            properties:
+              quantity:
+                type: integer
+                format: int32
+                description: The minimum quantity a customer must order in order to
+                  receive a discount. The array must contain at least one element with a value of 1.
+                  If multiple values are provided, they must be in strictly increasing order.
+                example: 1
+              unitPrice:
+                type: number
+                minimum: 1
+                maximum: 9999
+                description: The unit price including VAT, applicable when the customer orders at least the corresponding minimum quantity.
+                  If multiple prices are provided, they must be listed in strictly decreasing order,
+                  matching the increasing order of the associated quantity thresholds.
+                example: 9.99
+    Stock:
+      type: object
+      properties:
+        amount:
+          type: integer
+          format: int32
+          default: 0
+          description: The amount of stock available for the specified product present
+            in the retailers warehouse. Note that this should not be the FBB stock.
+        correctedStock:
+          type: integer
+          description: The available stock after accounting for open and processed orders, based on retailer provided inventory data. Once this value reaches zero the offer becomes unavailable for sale on the web shop.
+          format: int32
+        managedByRetailer:
+          type: boolean
+          description: Determines if stock levels are manually managed by the retailer
+            or automatically adjusted based on open orders.
+    Condition:
+      oneOf:
+        - $ref: '#/components/schemas/NewCondition'
+        - $ref: '#/components/schemas/SecondhandCondition'
+        - $ref: '#/components/schemas/RefurbishedCondition'
+      description: Describes the physical and functional state of the product, such
+        as new, secondhand, or refurbished.
+      discriminator:
+        propertyName: category
+        mapping:
+          NEW: '#/components/schemas/NewCondition'
+          SECONDHAND: '#/components/schemas/SecondhandCondition'
+          REFURBISHED: '#/components/schemas/RefurbishedCondition'
+      example:
+        category: SECONDHAND
+        state: AS_NEW
+        comment: Slightly used
+    ConditionCategory:
+      type: string
+      enum:
+        - NEW
+        - SECONDHAND
+        - REFURBISHED
+    NewCondition:
+      type: object
+      required:
+        - category
+      properties:
+        category:
+          $ref: '#/components/schemas/ConditionCategory'
+    SecondhandCondition:
+      type: object
+      required:
+        - category
+        - state
+      properties:
+        category:
+          $ref: '#/components/schemas/ConditionCategory'
+        state:
+          $ref: '#/components/schemas/State'
+        comment:
+          type: string
+          description: The description of the condition of the product. Only allowed
+            if name is not NEW and may not contain e-mail addresses.
+          example: slightly used
+    State:
+      type: string
+      enum:
+        - AS_NEW
+        - GOOD
+        - REASONABLE
+        - MODERATE
+    Grade:
+      type: string
+      enum:
+        - A
+        - B
+        - C
+    RefurbishedCondition:
+      type: object
+      required:
+        - category
+        - grade
+        - margin
+      properties:
+        category:
+          $ref: '#/components/schemas/ConditionCategory'
+        grade:
+          $ref: '#/components/schemas/Grade'
+        margin:
+          type: boolean
+          description: Indicates if there is a margin adjustment due to the condition.
+          example: true
+    CountryAvailability:
+      type: object
+      required:
+        - countryCode
+      properties:
+        countryCode:
+          $ref: '#/components/schemas/CountryCode'
+        forSale:
+          type: boolean
+          description: Specifies whether the offer should be listed for sale on bol.
+    CreateCountryAvailability:
+      type: object
+      required:
+        - countryCode
+      properties:
+        countryCode:
+          $ref: '#/components/schemas/CountryCode'
+    CountryCode:
+      type: string
+      description: The country that applies to the offer.
+      enum:
+        - NL
+        - BE
+    ConditionType:
+      type: string
+      enum:
+        - NEW
+        - SECONDHAND
+        - REFURBISHED
+    Fulfilment:
+      type: object
+      description: The fulfilment method. Fulfilled by the retailer (FBR) or fulfilled
+        by bol (FBB)
+      required:
+        - method
+      properties:
+        method:
+          type: string
+          enum:
+            - FBR
+            - FBB
+        schedule:
+          type: string
+          enum:
+            - BOL_DELIVERY_PROMISE
+            - MY_DELIVERY_PROMISE
+            - SHIPPING_VIA_BOL
+        profileId:
+          type: string
+          description: The identifier of the delivery promise profile.
+          example: 0c6573a2-a80c-48b7-a03e-d5939f1173f1
+        deliveryPromise:
+          type: object
+          description: Specifies the expected delivery timeframe for the offer. This value
+            will only be used in combination with fulfilmentMethod 'FBR'.
+          required:
+            - minimumDaysToCustomer
+            - maximumDaysToCustomer
+          properties:
+            minimumDaysToCustomer:
+              type: integer
+              format: int32
+              example: 0
+              description: The minimum amount of days it takes to deliver this item to the customer.
+            maximumDaysToCustomer:
+              type: integer
+              format: int32
+              example: 1
+              description: The maximum amount of days it takes to deliver this item to the customer.
+            ultimateOrderTime:
+              type: string
+              example: '14:00'
+              description: The ultimate order time the customer needs to place an order on the bol marketplace for next day delivery. If the order is placed after this time, the delivery promise will include one additional day.
+    Product:
+      type: object
+      properties:
+        bolProductId:
+          type: string
+          description: Identifier of the product specific to bol site.
+          example: '9200000045327288'
+  securitySchemes:
+    OAuth2:
+      type: http
+      description: JWT-based access to api.bol.com
+      in: header
+      scheme: bearer

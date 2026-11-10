@@ -13,6 +13,7 @@ from marketplace_integrations.bol.tests.utils import (
 	SECRET,
 	TOKEN,
 	FakeSession,
+	discard_pending_logs,
 	make_response,
 	make_settings,
 )
@@ -41,7 +42,7 @@ class TestRedact(FrappeTestCase):
 
 class TestLogCall(FrappeTestCase):
 	def setUp(self):
-		self.addCleanup(_discard_pending_logs)
+		self.addCleanup(discard_pending_logs)
 
 	def test_policy(self):
 		cases = [
@@ -191,7 +192,3 @@ def _delete_logs(method):
 	for entry in _logs(method):
 		frappe.delete_doc("Ecommerce Integration Log", entry.name, force=True, ignore_permissions=True)
 	frappe.db.commit()  # nosemgrep
-
-
-def _discard_pending_logs():
-	frappe.local.bol_pending_logs = None
