@@ -474,3 +474,54 @@ against an in-memory fake of the endpoints.
   `set_shipment_defaults` stores the defaults of the two new fields when they have no value. (`stock_buffer`, story 06,
   has the same gap on such sites.)
 - `tests/utils.make_bol_manager` (moved from `test_catalog.py`) gives a user with only the Bol Manager role.
+
+## ADR-012 — Verzenden via bol labels (story 09)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/retailer-api-v10.json` (Retailer API v10, Shipping Labels),
+bol's demo page *v10 Shipping Labels* and the demo environment.
+
+| Story says | Spec / docs / demo say | Decision |
+|---|---|---|
+| `POST /retailer/shipping-labels/delivery-options {orderItems[{orderItemId}]}` | Confirmed (`DeliveryOptionsRequest`); each item also takes an optional `quantity` (omitted = all open units). Errors: 400, 404 (403 isn't listed) | The Delivery Note's quantities are sent (summed per order item, as for shipments): a label for part of an order fits that part. The call only reads, so it's sent `safe` (retried like a GET). |
+| `deliveryOptions[] {shippingLabelOfferId, validUntilDate, transporterCode, labelType, labelPrice{totalPrice}, packageRestrictions, handoverDetails, recommended?}` | `recommended` is **required**; `validUntilDate` is a **date** (nullable); `totalPrice` is **excl. VAT**; also `labelDisplayName` (required); `labelType` ∈ PARCEL, MAILBOX, MAILBOX_LIGHT | An option is expired when its date is before today (system date); no date = valid. Chooser: recommended → preferred transporter (case-insensitive) → any; the cheapest of that group. |
+| `POST /retailer/shipping-labels {orderItems[{orderItemId, quantity}], shippingLabelOfferId}` → 202 | Confirmed (`ShippingLabelRequest`), 400 only. Demo: `CREATE_SHIPPING_LABEL` ProcessStatus | `entityId` is the shippingLabelId (functional docs). A SUCCESS without one → *Failed* (a new label can be bought). |
+| `GET /retailer/shipping-labels/{id}`, Accept `application/vnd.retailer.v10+pdf` | Confirmed; also sends `X-Track-And-Trace-Code` / `X-Transporter-Code` headers (and HEAD for headers only) | The headers aren't read: `BolClient` returns the bytes, the transporter comes from the chosen option, and bol knows the label's T&T. |
+
+**Demo environment (checked live, `dev.localhost`).** Delivery options answer only order item `2095052647` (two TNT
+options, the recommended parcel at 4.41 and a TNT_BRIEF mailbox label at 2.88), with `validUntilDate` in **2020**; it is
+`tests/fixtures/delivery_options.json`. Any other order item gets a 400. The label POST answers a canned
+`CREATE_SHIPPING_LABEL` ProcessStatus, which (like every demo process) stays `PENDING`. The PDF GET answers only label
+`c628ba4f-f31a-4fac-a6a0-062326d0dbbd`, with 141 bytes of plain text ("THIS IS A FAKE PDF FILE …").
+
+**Decisions.**
+- **Statuses** (`bol_label_status`, `db_set` only): *Requested* (bol is making it; with a *bol Shipping Label ID* it's
+  made but not downloaded), *Ready* (PDF attached), *Failed* (bol refused; a new label can be bought). All three label
+  fields are `no_copy`, `bol_label_transporter` too (the story didn't say), so an amended or duplicated DN starts clean.
+- **Buying** is an explicit button, so bol is called in the request (overview §4.3). Bol Manager/System Manager **and**
+  Delivery Note write permission (as Retry, ADR-011). The DN row is locked first: a double click waits, then finds
+  *Requested* and is refused. A label is never bought while one is *Requested* or *Ready*.
+- **Button failures** are logged (the log survives the rollback, ADR-005) and shown as a translated message; the DN is
+  left as it was. 403 → "not registered for Verzenden via bol"; no option left → "No VVB option available"; 400 → bol's
+  violations. **An ambiguous label POST** (or a 202 without `processStatusId`) leaves the DN unchanged and says to try
+  again: there's no endpoint to find a label by order item, and bol charges only the label a shipment is confirmed with,
+  so an orphan label costs nothing.
+- **Download failures after SUCCESS** (bol error, or a body that isn't a PDF) are caught in the handler: the label id is
+  kept, the status stays *Requested*, log + comment + message; **Download bol label again** only GETs. Checking the
+  `%PDF-` signature first matters because Frappe's File check (`pdf_contains_js`) raises a raw pypdf error on anything
+  else (as on the demo).
+- **The PDF** is a private File `bol-label-{dn}.pdf` attached to the DN: readable by whoever may read the DN.
+- **The user** who clicked gets a desk message (realtime `msgprint`) when the label is ready or failed; the DN is
+  updated with `notify=True`, so an open form refreshes.
+- **Submit** (while *Push Shipments* is on): items bol ships need a *Ready* label; any DN with a *Requested* label waits
+  for it. A DN with a label skips story 08's transporter and T&T checks, and the shipment is confirmed with
+  `shippingLabelId` (`build_shipment`, story 08).
+- **Items are fixed once a label is bought**: changing lines or quantities of a DN with a *Requested*/*Ready* label is
+  refused; delete the draft and make a new one. To make that possible, `hooks.ignore_links_on_delete` lists **Bol
+  Process** and **Ecommerce Integration Log**: their Dynamic Links would otherwise block deleting any document they refer
+  to. A handler for a deleted DN does nothing.
+- **Use Verzenden via bol needs Push Shipments** (a label is used by confirming the shipment through the API).
+  **bol Labels for Own Shipments** (`vvb_for_retailer_items`) offers the button on DNs of items you ship yourself; the
+  person decides whether bol's price (in the timeline comment) beats their own contract. No contract-price setting.
+- **Demo:** the expiry check is skipped (its options expired in 2020); its process never finishes and its "PDF" isn't
+  one, so on the demo a label stays *Requested*. The flows are covered by tests against an in-memory fake.
+- The form shows **Get bol label** only where it applies: the DN's `onload` hook sets `__onload.bol_label_allowed`.

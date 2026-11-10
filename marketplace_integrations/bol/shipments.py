@@ -73,15 +73,15 @@ def validate_delivery_note(doc, method=None):
 				"Some items of bol order {0} are shipped by bol (Verzenden via bol) and others by you. Create separate Delivery Notes."
 			).format(order_ids[0])
 		)
-	if not doc.bol_transporter_code and _ships_itself(lines):
+	if not doc.bol_transporter_code and ships_itself(lines):
 		doc.bol_transporter_code = _settings().default_transporter_code
 
 
 def before_submit_delivery_note(doc, method=None):
 	if doc.is_return or not doc.bol_order_id or not shipments_on():
 		return
-	# Items bol ships need a bol label instead (story 09).
-	if not _ships_itself(shipment_lines(doc)):
+	# A bol label names the carrier and its own track & trace. Items bol ships always need one (labels.py, story 09).
+	if doc.bol_shipping_label_id or not ships_itself(shipment_lines(doc)):
 		return
 	if not doc.bol_transporter_code:
 		frappe.throw(_("Set the bol Transporter before submitting."), title=_("bol Shipment"))
@@ -476,7 +476,7 @@ def _party(line: dict) -> str:
 	return line["distribution_party"] or RETAILER
 
 
-def _ships_itself(lines: list[dict]) -> bool:
+def ships_itself(lines: list[dict]) -> bool:
 	return all(_party(line) == RETAILER for line in lines)
 
 

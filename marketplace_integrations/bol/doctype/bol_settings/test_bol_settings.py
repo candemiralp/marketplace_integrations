@@ -230,3 +230,19 @@ class TestOrderImportSettings(FrappeTestCase):
 		group = make_warehouse("_Test bol Group Warehouse", is_group=1)
 		with self.assertRaisesRegex(frappe.ValidationError, "group"):
 			self._settings(warehouse=group).validate()
+
+
+class TestVvbSettings(FrappeTestCase):
+	def _settings(self, **values):
+		doc = frappe.get_single("Bol Settings")
+		doc.update(
+			{"enabled": 0, "use_vvb": 1, "push_shipments": 1, "default_transporter_code": "TNT", **values}
+		)
+		return doc
+
+	def test_valid(self):
+		self._settings().validate()
+
+	def test_needs_push_shipments(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Push Shipments"):
+			self._settings(push_shipments=0).validate()

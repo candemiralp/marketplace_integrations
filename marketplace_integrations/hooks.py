@@ -171,8 +171,15 @@ doc_events = {
 	},
 	"Brand": {"on_update": "marketplace_integrations.bol.offers.on_brand_update"},
 	"Delivery Note": {
-		"validate": "marketplace_integrations.bol.shipments.validate_delivery_note",
-		"before_submit": "marketplace_integrations.bol.shipments.before_submit_delivery_note",
+		"onload": "marketplace_integrations.bol.labels.onload_delivery_note",
+		"validate": [
+			"marketplace_integrations.bol.shipments.validate_delivery_note",
+			"marketplace_integrations.bol.labels.validate_delivery_note",
+		],
+		"before_submit": [
+			"marketplace_integrations.bol.shipments.before_submit_delivery_note",
+			"marketplace_integrations.bol.labels.before_submit_delivery_note",
+		],
 		"on_submit": "marketplace_integrations.bol.shipments.on_submit_delivery_note",
 		"on_update_after_submit": "marketplace_integrations.bol.shipments.on_update_after_submit_delivery_note",
 		"before_cancel": "marketplace_integrations.bol.shipments.before_cancel_delivery_note",
@@ -254,6 +261,9 @@ scheduler_events = {
 # -----------------------------------------------------------
 
 # ignore_links_on_delete = ["Communication", "ToDo"]
+# They record what happened to a document; they never keep it from being deleted (e.g. a draft Delivery Note with an
+# unused bol label, story 09). Their Dynamic Links would otherwise block the delete.
+ignore_links_on_delete = ["Bol Process", "Ecommerce Integration Log"]
 
 # Request Events
 # ----------------

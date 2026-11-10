@@ -34,7 +34,10 @@ HANDLERS: dict[str, tuple[Callable, Callable]] = {}
 
 # Modules that call register(). A background job only imports this module, so they are imported
 # before any handler lookup. Each story that adds a handler adds its module here.
-HANDLER_MODULES: tuple[str, ...] = ("marketplace_integrations.bol.shipments",)
+HANDLER_MODULES: tuple[str, ...] = (
+	"marketplace_integrations.bol.shipments",
+	"marketplace_integrations.bol.labels",
+)
 
 
 def register(name: str, on_success: Callable, on_failure: Callable):

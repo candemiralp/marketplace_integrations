@@ -167,7 +167,7 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"depends_on": "eval:doc.bol_order_id",
 			"collapsible": 1,
 			# Like Transporter Info: open once it holds something.
-			"collapsible_depends_on": "eval:doc.bol_track_and_trace || doc.bol_shipment_status",
+			"collapsible_depends_on": "eval:doc.bol_track_and_trace || doc.bol_shipment_status || doc.bol_label_status",
 		},
 		{
 			# Set from the Sales Order on every validate.
@@ -217,6 +217,32 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"insert_after": "bol_shipment_status",
 			"read_only": 1,
 			"allow_on_submit": 1,
+			"no_copy": 1,
+		},
+		# The bol label (Verzenden via bol, story 09), bought on the draft. no_copy: an amended DN buys its own.
+		{
+			"fieldname": "bol_label_status",
+			"fieldtype": "Select",
+			"label": "bol Label Status",
+			"options": "\nRequested\nReady\nFailed",
+			"insert_after": "bol_shipment_id",
+			"read_only": 1,
+			"no_copy": 1,
+		},
+		{
+			"fieldname": "bol_shipping_label_id",
+			"fieldtype": "Data",
+			"label": "bol Shipping Label ID",
+			"insert_after": "bol_label_status",
+			"read_only": 1,
+			"no_copy": 1,
+		},
+		{
+			"fieldname": "bol_label_transporter",
+			"fieldtype": "Data",
+			"label": "bol Label Transporter",
+			"insert_after": "bol_shipping_label_id",
+			"read_only": 1,
 			"no_copy": 1,
 		},
 	],

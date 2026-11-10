@@ -25,6 +25,7 @@ class BolSettings(Document):
 		self.validate_offer_sync()
 		self.validate_stock_sync()
 		self.validate_order_import()
+		self.validate_vvb()
 		if not self.enabled:
 			return
 		missing = [_(self.meta.get_label(field)) for field in REQUIRED_WHEN_ENABLED if not self.get(field)]
@@ -95,6 +96,13 @@ class BolSettings(Document):
 		self.validate_warehouse()
 		for field in ("tax_template_nl", "tax_template_be"):
 			self.validate_tax_template(self.get(field))
+
+	def validate_vvb(self):
+		# A label is used by confirming the shipment with it through the API (story 08).
+		if self.use_vvb and not self.push_shipments:
+			frappe.throw(
+				_("Switch on Push Shipments before Use Verzenden via bol."), title=_("Missing Settings")
+			)
 
 	def validate_warehouse(self):
 		if frappe.db.get_value("Warehouse", self.warehouse, "is_group"):
