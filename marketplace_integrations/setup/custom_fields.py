@@ -3,6 +3,8 @@
 # Conventions: fieldnames start with `bol_`; bol identifiers are `read_only` and `no_copy`
 # (and `unique` where they are a natural key).
 
+from marketplace_integrations.bol.mappers.shipment import TRANSPORTER_CODES
+
 # The party bol's buyer is (all bol orders are booked on one bol customer): what an invoice must name.
 # Not no_copy, so ERPNext's mappers carry them from Sales Order to Delivery Note and Sales Invoice.
 # Buyer PII, like the bol Buyer addresses (cleaned up in story 15).
@@ -154,7 +156,67 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 		*_buyer_fields("bol_buyer_section"),
 	],
 	# The Customer's Purchase Order section; the values come from the Sales Order.
-	"Delivery Note": _buyer_fields("po_date"),
+	# The bol.com section, next to Transporter Info: the shipment confirmed at bol (story 08).
+	"Delivery Note": [
+		*_buyer_fields("po_date"),
+		{
+			"fieldname": "bol_shipment_section",
+			"fieldtype": "Section Break",
+			"label": "bol.com Shipment",
+			"insert_after": "lr_date",
+			"depends_on": "eval:doc.bol_order_id",
+		},
+		{
+			# Set from the Sales Order on every validate.
+			"fieldname": "bol_order_id",
+			"fieldtype": "Data",
+			"label": "bol Order ID",
+			"insert_after": "bol_shipment_section",
+			"read_only": 1,
+			"in_standard_filter": 1,
+		},
+		{
+			"fieldname": "bol_transporter_code",
+			"fieldtype": "Select",
+			"label": "bol Transporter",
+			"options": "\n" + "\n".join(TRANSPORTER_CODES),
+			"description": "bol's code for the carrier. PostNL is TNT.",
+			"insert_after": "bol_order_id",
+		},
+		{
+			"fieldname": "bol_track_and_trace",
+			"fieldtype": "Data",
+			"label": "bol Track & Trace",
+			"description": "Can be added after submitting, as long as bol has none for this shipment yet.",
+			"insert_after": "bol_transporter_code",
+			"allow_on_submit": 1,
+		},
+		{
+			"fieldname": "bol_shipment_column",
+			"fieldtype": "Column Break",
+			"insert_after": "bol_track_and_trace",
+		},
+		{
+			"fieldname": "bol_shipment_status",
+			"fieldtype": "Select",
+			"label": "bol Shipment Status",
+			"options": "\nPending\nConfirmed\nFailed\nUnknown",
+			"insert_after": "bol_shipment_column",
+			"read_only": 1,
+			"allow_on_submit": 1,
+			"no_copy": 1,
+			"in_standard_filter": 1,
+		},
+		{
+			"fieldname": "bol_shipment_id",
+			"fieldtype": "Data",
+			"label": "bol Shipment ID",
+			"insert_after": "bol_shipment_status",
+			"read_only": 1,
+			"allow_on_submit": 1,
+			"no_copy": 1,
+		},
+	],
 	"Sales Invoice": _buyer_fields("po_date"),
 	# Per line: what shipments (08) and cancellations (10) refer to at bol.
 	"Sales Order Item": [

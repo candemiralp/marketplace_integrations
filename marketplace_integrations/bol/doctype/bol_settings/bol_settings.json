@@ -30,7 +30,12 @@
   "import_orders_placed_after",
   "orders_column",
   "tax_template_nl",
-  "tax_template_be"
+  "tax_template_be",
+  "shipments_section",
+  "push_shipments",
+  "require_track_and_trace",
+  "shipments_column",
+  "default_transporter_code"
  ],
  "fields": [
   {
@@ -197,13 +202,45 @@
    "label": "Tax Template BE",
    "mandatory_depends_on": "eval:doc.import_orders",
    "options": "Sales Taxes and Charges Template"
+  },
+  {
+   "fieldname": "shipments_section",
+   "fieldtype": "Section Break",
+   "label": "Shipments"
+  },
+  {
+   "default": "0",
+   "description": "Confirm the shipment at bol when a Delivery Note for a bol order is submitted, with its track & trace.",
+   "fieldname": "push_shipments",
+   "fieldtype": "Check",
+   "label": "Push Shipments"
+  },
+  {
+   "default": "1",
+   "description": "A Delivery Note for items you ship yourself can't be submitted without a track & trace code.",
+   "fieldname": "require_track_and_trace",
+   "fieldtype": "Check",
+   "label": "Require Track & Trace"
+  },
+  {
+   "fieldname": "shipments_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "TNT",
+   "description": "Carrier filled in on new bol Delivery Notes. bol's code for PostNL is TNT.",
+   "fieldname": "default_transporter_code",
+   "fieldtype": "Select",
+   "label": "Default Transporter",
+   "mandatory_depends_on": "eval:doc.push_shipments",
+   "options": "TNT\nTNT-EXTRA\nTNT_BRIEF\nBRIEFPOST\nDHL\nDHLFORYOU\nDPD-NL\nDPD-BE\nBPOST_BE\nBPOST_BRIEF\nGLS\nUPS\nOTHER"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 23:00:00.000000",
+ "modified": "2026-11-10 23:30:00.000000",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",

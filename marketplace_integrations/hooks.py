@@ -44,7 +44,11 @@ required_apps = ["erpnext", "ecommerce_integrations"]
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
-doctype_js = {"Brand": "public/js/brand.js", "Item": "public/js/item.js"}
+doctype_js = {
+	"Brand": "public/js/brand.js",
+	"Delivery Note": "public/js/delivery_note.js",
+	"Item": "public/js/item.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -166,6 +170,13 @@ doc_events = {
 		"on_trash": "marketplace_integrations.bol.offers.on_item_price_change",
 	},
 	"Brand": {"on_update": "marketplace_integrations.bol.offers.on_brand_update"},
+	"Delivery Note": {
+		"validate": "marketplace_integrations.bol.shipments.validate_delivery_note",
+		"before_submit": "marketplace_integrations.bol.shipments.before_submit_delivery_note",
+		"on_submit": "marketplace_integrations.bol.shipments.on_submit_delivery_note",
+		"on_update_after_submit": "marketplace_integrations.bol.shipments.on_update_after_submit_delivery_note",
+		"before_cancel": "marketplace_integrations.bol.shipments.before_cancel_delivery_note",
+	},
 }
 
 # doc_events = {
@@ -188,6 +199,7 @@ scheduler_events = {
 			"marketplace_integrations.bol.stock.poll_stock",
 		],
 		"*/5 * * * *": ["marketplace_integrations.bol.orders.poll_orders"],
+		"*/10 * * * *": ["marketplace_integrations.bol.shipments.sweep_shipments"],
 		# Early morning, after the daily offer reconcile has re-queued offers missing at bol.
 		"0 5 * * *": ["marketplace_integrations.bol.stock.reconcile_stock"],
 	},

@@ -1,0 +1,42 @@
+{
+  "shipmentId": "953266576",
+  "shipmentDateTime": "2018-04-20T19:10:19+02:00",
+  "shipmentReference": "Shipment2",
+  "pickupPoint": false,
+  "order": {"orderId": "7616222700", "orderPlacedDateTime": "2018-04-20T16:09:47+02:00"},
+  "shipmentDetails": {
+    "salutation": "FEMALE",
+    "firstName": "Leia",
+    "surname": "Organa",
+    "streetName": "Alderaanweg",
+    "houseNumber": "100",
+    "zipCode": "3528BJ",
+    "city": "Utrecht",
+    "countryCode": "NL",
+    "email": "2fjb3hdaioycvdscjnngqhmw5f5edk@verkopen.test2.bol.com",
+    "company": "Senator.nl",
+    "language": "nl"
+  },
+  "shipmentItems": [
+    {
+      "orderItemId": "6107331383",
+      "fulfilment": {"method": "FBR", "latestDeliveryDate": "2018-04-21"},
+      "offer": {"offerId": "8f6283e3-de98-c92f-e053-3598790a63b5", "reference": "Test3"},
+      "product": {"ean": "8712626055143", "title": "Star Wars Prequel Trilogy"},
+      "quantity": 1,
+      "quantityShipped": 1,
+      "unitPrice": 24.5,
+      "commission": 2.0
+    }
+  ],
+  "transport": {
+    "transportId": "356988715",
+    "transporterCode": "TNT",
+    "trackAndTrace": "3SBOLD1234567",
+    "transportEvents": [
+      {"eventCode": "AT_TRANSPORTER", "eventDateTime": "2021-07-28T22:21:07+02:00"},
+      {"eventCode": "IN_TRANSIT", "eventDateTime": "2021-07-29T10:21:07+02:00"},
+      {"eventCode": "DELIVERED_AT_CUSTOMER", "eventDateTime": "2021-07-29T13:21:07+02:00"}
+    ]
+  }
+}

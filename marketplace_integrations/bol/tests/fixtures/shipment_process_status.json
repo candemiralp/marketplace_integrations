@@ -1,0 +1,14 @@
+{
+  "processStatusId": "019bbcbc-1a21-77c9-9de6-0726d1379c91fff",
+  "eventType": "CREATE_SHIPMENT",
+  "description": "Create shipment.",
+  "status": "PENDING",
+  "createTimestamp": "2026-11-10T20:07:04.324096554+01:00",
+  "links": [
+    {
+      "rel": "self",
+      "href": "https://api.bol.com/shared-demo/process-status/019bbcbc-1a21-77c9-9de6-0726d1379c91fff",
+      "method": "GET"
+    }
+  ]
+}
