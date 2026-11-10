@@ -74,6 +74,7 @@ TEST_UOM = "_Test bol UOM"
 TEST_ITEM_GROUP = "_Test bol Item Group"
 TEST_BRAND = "_Test bol Brand"
 TEST_PRICE_LIST = "_Test bol Price List"
+TEST_WAREHOUSE = "_Test bol Warehouse"
 OPERATOR_ID = "0c6573a2-a80c-48b7-a03e-d5939f1173fa"
 
 
@@ -138,3 +139,12 @@ def make_item_price(item_code: str, rate: float, price_list: str = TEST_PRICE_LI
 	return frappe.get_doc(
 		{"doctype": "Item Price", "item_code": item_code, "price_list": price_list, "price_list_rate": rate}
 	).insert()
+
+
+def make_warehouse(name: str = TEST_WAREHOUSE, is_group: int = 0) -> str:
+	# Saved without validation: a Warehouse needs a Company, and the test site has none.
+	if not frappe.db.exists("Warehouse", name):
+		frappe.get_doc(
+			{"doctype": "Warehouse", "name": name, "warehouse_name": name, "is_group": is_group}
+		).db_insert()
+	return name

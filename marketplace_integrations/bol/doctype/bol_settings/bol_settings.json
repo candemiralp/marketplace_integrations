@@ -17,7 +17,12 @@
   "price_list",
   "offers_column",
   "default_min_days",
-  "default_max_days"
+  "default_max_days",
+  "stock_section",
+  "sync_stock",
+  "warehouse",
+  "stock_column",
+  "stock_buffer"
  ],
  "fields": [
   {
@@ -99,13 +104,46 @@
    "fieldname": "default_max_days",
    "fieldtype": "Int",
    "label": "Default Max Days to Customer"
+  },
+  {
+   "fieldname": "stock_section",
+   "fieldtype": "Section Break",
+   "label": "Stock"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.sync_offers",
+   "description": "Keep the stock of each bol offer equal to the item's available-to-sell quantity in the warehouse below. Needs Sync Offers.",
+   "fieldname": "sync_stock",
+   "fieldtype": "Check",
+   "label": "Sync Stock"
+  },
+  {
+   "description": "The warehouse bol orders ship from. Its actual qty minus open Sales Orders, stock reservations and the buffer is what bol may sell.",
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "mandatory_depends_on": "eval:doc.sync_stock",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "stock_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Units per item kept back from bol, so two channels can't sell the last unit twice. An Item can set its own (bol Stock Buffer).",
+   "fieldname": "stock_buffer",
+   "fieldtype": "Int",
+   "label": "Stock Buffer",
+   "non_negative": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 18:00:00.000000",
+ "modified": "2026-11-10 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",

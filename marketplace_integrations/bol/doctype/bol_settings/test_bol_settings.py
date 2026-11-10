@@ -8,10 +8,11 @@ from frappe.tests.utils import FrappeTestCase
 
 from marketplace_integrations.bol.api.errors import BolAuthError, BolTransientError
 from marketplace_integrations.bol.doctype.bol_settings import bol_settings
-from marketplace_integrations.bol.tests.utils import make_price_list
+from marketplace_integrations.bol.tests.utils import make_price_list, make_warehouse
 
 # These tests need no Company; ERPNext's Company test records need ERPNext's full test setup.
-test_ignore = ["Company"]
+# Warehouse links to Company too: the stock tests create a warehouse of their own (tests/utils.make_warehouse).
+test_ignore = ["Company", "Warehouse"]
 
 
 class TestBolSettings(FrappeTestCase):
@@ -124,3 +125,43 @@ class TestOfferSyncSettings(FrappeTestCase):
 	def test_price_list_in_another_currency_rejected(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "EUR"):
 			self._settings(price_list=make_price_list("_Test bol USD", currency="USD")).validate()
+
+
+class TestStockSyncSettings(FrappeTestCase):
+	def setUp(self):
+		self.addCleanup(frappe.db.rollback)
+
+	def _settings(self, **values):
+		doc = frappe.get_single("Bol Settings")
+		doc.update(
+			{
+				"enabled": 0,
+				"sync_offers": 1,
+				"price_list": make_price_list(),
+				"default_max_days": 2,
+				"sync_stock": 1,
+				"warehouse": make_warehouse(),
+				"stock_buffer": 1,
+				**values,
+			}
+		)
+		return doc
+
+	def test_valid(self):
+		self._settings().validate()
+
+	def test_off_needs_nothing(self):
+		self._settings(sync_stock=0, warehouse=None).validate()
+
+	def test_needs_sync_offers(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Sync Offers"):
+			self._settings(sync_offers=0).validate()
+
+	def test_needs_a_warehouse(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Warehouse"):
+			self._settings(warehouse=None).validate()
+
+	def test_group_warehouse_rejected(self):
+		group = make_warehouse("_Test bol Group Warehouse", is_group=1)
+		with self.assertRaisesRegex(frappe.ValidationError, "group"):
+			self._settings(warehouse=group).validate()

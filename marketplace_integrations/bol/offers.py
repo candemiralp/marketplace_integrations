@@ -79,7 +79,7 @@ def adopt_existing_offers() -> dict:
 	}
 	seen = set()
 	try:
-		for page_offers, next_cursor in _offer_pages(get_client()):
+		for page_offers, next_cursor in offer_pages(get_client()):
 			report["pages"] += 1
 			for offer in page_offers:
 				if offer.get("offerId") in seen:
@@ -99,7 +99,7 @@ def adopt_existing_offers() -> dict:
 	return report
 
 
-def _offer_pages(client, params: dict | None = None):
+def offer_pages(client, params: dict | None = None):
 	"""Yield (offers, next_cursor) for each page of bol's offer list."""
 	cursor = None
 	while True:
@@ -331,13 +331,20 @@ def _adopt_or_create(client, item, settings) -> dict | None:
 		_insert_mapping(item.name, found[0]["offerId"], ean)
 		return found[0]
 
+	# Imported here because bol.stock imports this module.
+	from marketplace_integrations.bol import stock
+
+	stock_on = stock.stock_on(settings)
+	amount = stock.available_stock(item.name, settings) if stock_on else 0
 	created = client.request(
-		"POST", PATH, version=VERSION, json=_desired(item, settings), reference=_reference(item)
+		"POST", PATH, version=VERSION, json=_desired(item, settings, amount), reference=_reference(item)
 	)
 	offer_id = (created or {}).get("offerId")
 	if not offer_id:
 		raise BolError("bol answered the create without an offerId", ambiguous=True)
 	_insert_mapping(item.name, offer_id, ean)
+	if stock_on:
+		stock.record_pushed(item.name, amount)
 	# The offer exists at bol now: the mapping must survive whatever fails after this point.
 	frappe.db.commit()  # nosemgrep
 	frappe.db.savepoint(SYNC_SAVEPOINT)
@@ -345,7 +352,7 @@ def _adopt_or_create(client, item, settings) -> dict | None:
 	return None
 
 
-def _desired(item, settings) -> dict:
+def _desired(item, settings, stock: int = 0) -> dict:
 	"""The for-sale offer for `item`. Raises BolMappingError (with a translated message) when it can't be built."""
 	ean = _ean(item)
 	price = _price(item, settings)
@@ -358,8 +365,10 @@ def _desired(item, settings) -> dict:
 	min_days = cint(item.bol_min_days) or cint(settings.default_min_days)
 	max_days = cint(item.bol_max_days) or cint(settings.default_max_days)
 	try:
-		# Stock is set by the stock sync (story 06); a new offer starts with none.
-		return build_offer({"item_code": item.name, "ean": ean}, price, operator_id, min_days, max_days, 0)
+		# Only a create sends the stock; after that the stock sync owns it (diff_offer never compares it).
+		return build_offer(
+			{"item_code": item.name, "ean": ean}, price, operator_id, min_days, max_days, stock
+		)
 	except BolMappingError as e:
 		if e.reason == "price_range":
 			message = _("The price {0} of {1} is outside bol's range of 1 to 9999.").format(price, item.name)
@@ -461,7 +470,7 @@ def reconcile_offers():
 	client = get_client()
 	seen = set()
 	try:
-		for page_offers, _cursor in _offer_pages(client):
+		for page_offers, _cursor in offer_pages(client):
 			for offer in page_offers:
 				offer_id = offer.get("offerId")
 				if offer_id not in mapped or offer_id in seen:

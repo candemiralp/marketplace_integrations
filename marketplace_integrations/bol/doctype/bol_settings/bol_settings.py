@@ -23,6 +23,7 @@ class BolSettings(Document):
 	def validate(self):
 		self.validate_delivery_days()
 		self.validate_offer_sync()
+		self.validate_stock_sync()
 		if not self.enabled:
 			return
 		missing = [_(self.meta.get_label(field)) for field in REQUIRED_WHEN_ENABLED if not self.get(field)]
@@ -64,6 +65,21 @@ class BolSettings(Document):
 			frappe.throw(
 				_("bol sells in {0}, but Price List {1} is in {2}.").format(
 					BOL_CURRENCY, self.price_list, currency
+				)
+			)
+
+	def validate_stock_sync(self):
+		if not self.sync_stock:
+			return
+		if not self.sync_offers:
+			# Offers missing at bol are recreated by the offer sync, with their stock.
+			frappe.throw(_("Switch on Sync Offers before Sync Stock."), title=_("Missing Settings"))
+		if not self.warehouse:
+			frappe.throw(_("Set a Warehouse before switching on Sync Stock."), title=_("Missing Settings"))
+		if frappe.db.get_value("Warehouse", self.warehouse, "is_group"):
+			frappe.throw(
+				_("Warehouse {0} is a group warehouse. Pick the warehouse that holds the stock.").format(
+					self.warehouse
 				)
 			)
 
