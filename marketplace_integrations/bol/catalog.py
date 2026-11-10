@@ -38,9 +38,9 @@ def _publish_problems(doc) -> list[str]:
 		)
 	if not doc.is_stock_item:
 		problems.append(_("{0} is not a stock item. Only stock items can be sold on bol.").format(doc.name))
-	ean_problem = _ean_problem(doc)
-	if ean_problem:
-		problems.append(ean_problem)
+	ean = ean_problem(doc)
+	if ean:
+		problems.append(ean)
 	if not doc.brand:
 		problems.append(
 			_("Set a Brand on {0}. Its bol economic operator comes from the Brand.").format(doc.name)
@@ -61,7 +61,7 @@ def _publish_problems(doc) -> list[str]:
 	return problems
 
 
-def _ean_problem(doc) -> str | None:
+def ean_problem(doc) -> str | None:
 	try:
 		get_item_ean(doc)
 	except BolMappingError as e:

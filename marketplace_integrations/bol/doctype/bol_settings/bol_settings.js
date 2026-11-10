@@ -2,6 +2,10 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Bol Settings", {
+	setup(frm) {
+		frm.set_query("price_list", () => ({ filters: { selling: 1 } }));
+	},
+
 	refresh(frm) {
 		frm.add_custom_button(__("Test Connection"), () => {
 			// The server tests the saved credentials, so unsaved edits would be misleading.

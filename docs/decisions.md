@@ -269,3 +269,60 @@ failure inside the client would also defeat `log_once` (rule 6).
   - **Demo**: the repeat is treated as the last page, so adopting finishes normally there.
   Offers are de-duplicated by `offerId` within a run: one seen again is skipped and only counted in
   the report's `repeated`, so the outcome counts stay correct. Operators are de-duplicated by `id`.
+
+---
+
+## ADR-008 — Offer sync (story 05)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/offers-v11.yaml` (Offers API 11.5.0) and the
+demo environment.
+
+| Story says | Spec / demo says | Decision |
+|---|---|---|
+| Create returns `offerId` (201) | `POST /retailer/offers` → 201 `RetailerOffer {offerId}`. `CreateOfferRequest` requires `ean, condition, pricing, fulfilment`; `stock` (`CreateStock`) requires `amount, managedByRetailer` | Send `condition: {category: NEW}` and `stock: {amount: 0, managedByRetailer: false}` (story 06 sets the real stock, with `false` as story 06 decides). A create answer **without `offerId`** counts as ambiguous: the next run's EAN lookup finds the offer. |
+| Update (PATCH) | `PATCH /retailer/offers/{id}` → 204. `PatchOfferRequest`: `economicOperatorId, onHoldByRetailer, reference, countryAvailabilities, pricing, fulfilment, stock, unknownProductTitle`. **`ean` and `condition` can't be patched** | `diff_offer` compares only `economicOperatorId, onHoldByRetailer, reference, pricing, fulfilment`. `stock` belongs to story 06. |
+| Delivery schedule `MY_DELIVERY_PROMISE` / `BOL_DELIVERY_PROMISE` | `fulfilment.schedule` ∈ `BOL_DELIVERY_PROMISE, MY_DELIVERY_PROMISE, SHIPPING_VIA_BOL`; `deliveryPromise {minimumDaysToCustomer, maximumDaysToCustomer, ultimateOrderTime}`. The demo GET **echoes `schedule`** | Send `MY_DELIVERY_PROMISE` + min/max days. `schedule` is compared, so an offer on `BOL_DELIVERY_PROMISE` (e.g. adopted) is switched over. |
+| `pricing.bundlePrices[]` 1–4, `unitPrice` 1–9999 | Confirmed; the unit price **includes VAT** | One bundle price (quantity 1), rounded to cents. The bol price list must hold VAT-inclusive EUR prices. |
+| `reference` ≤ 100 chars, the item_code | Confirmed. ERPNext item codes can be 140 | Cut to 100 characters: it's informational only. |
+| — | `countryAvailabilities` optional on create | Not sent: bol's default applies. |
+| Delete → 204 | No 404 documented | A 404 on delete means "already gone": the mapping is removed anyway. |
+| Not-for-sale reasons | `GET /retailer/offers/{id}/not-for-sale-reasons` → `{offerId, countries[{countryCode, reasons[{category, code, description, missingAttributes?}]}]}` | One line per reason in `bol_status_detail`: `NL: Price too high (4000-1)`. |
+| Reconcile: "list `for-sale=false` first" | The list returns every offer's `onHoldByRetailer` and `countryAvailabilities` | **One unfiltered list pass** gives every status, at the same number of calls or fewer, and shows which mapped offers are gone at bol. Reasons are fetched only for `Not for sale` offers. |
+| — | 409 documented on POST/PATCH | The client raises a plain `BolError` (no retry): logged, the job fails. |
+
+**Demo environment (checked live).** GET (one offer, list, `eans=` filter, reasons) answers as the spec
+says. **Writes can't be checked there**: every PATCH gets a bare HTTP 403 (empty body, same token that
+POSTs fine), and POST and DELETE answer with a v10-style process-status example instead of the v11
+response. On the demo a sync therefore ends in `Not synced` (create without `offerId`) or a 403 auth error
+(PATCH). The flows are covered by tests against an in-memory fake of the endpoints.
+
+**Decisions.**
+- **Status.** `bol_offer_status` holds `For sale`, `Not for sale`, `On hold` (from bol), or ours: `Not synced`
+  (with the reason in `bol_status_detail`, so the list view can filter on the status) and `Deleted`.
+  Written with `db_set(update_modified=False)`. `db_set` runs `on_change`, never `on_update`, so writing
+  the status never triggers another sync.
+- **Hold needs nothing.** Desired state for an item that is unticked or disabled is `{"onHoldByRetailer": true}`
+  only, so an item without a price or operator can still be taken off sale.
+- **A live offer whose data broke is left alone** (owner's decision): no price, a price out of range or no
+  operator gives `Not synced`, but the offer keeps its last price and stays on sale. Deleting and re-adding
+  an Item Price never takes a listing offline in between. A missing price never sends 0.
+- **Price** comes from ERPNext's `get_item_price` (stock UOM, no customer-specific rows, valid today).
+- **Delivery days**: Item value, 0 = Settings default (ADR-007). Settings require *Default Max Days* when
+  *Sync Offers* is on: without it items would promise delivery on the day of the order.
+- **No duplicates.** Before any POST: an EAN already mapped to another item's offer → `Not synced`; then
+  `GET ?eans=` adopts an existing offer (several offers for the EAN → `Not synced`). After a successful POST
+  the mapping is **committed at once**, so nothing failing afterwards can lose it. An ambiguous POST isn't
+  raised (no job retry); the next run's lookup settles it.
+- **Transactions.** `sync_offer` works inside a savepoint. Handled failures roll back to it, write the
+  status, log once and comment. Other bol errors roll back, log once, comment, commit (to keep the comment),
+  then re-raise so the job fails.
+- **Change detection** on Item and Brand treats `0`, `""` and `None` as equal. `has_value_changed` doesn't, so
+  saves through the API (Int left `None`) would queue a sync on every save.
+- **Deduplication race.** `enqueue(deduplicate=True)` skips a job that is queued *or running*. A price change
+  committed while the job for that item is already running is skipped. The daily reconcile closes this
+  gap: it builds each item's desired offer and compares it with the listed offer (`diff_offer`), queueing a
+  sync for any difference, with no extra GETs. That also covers failed jobs (story: "the reconcile or the next
+  trigger retries"), Item Prices that expire, and offers adopted in story 04 that differ from ERPNext.
+  Mapped offers missing from the list and `bol_enabled` items without a mapping are queued too.
+- **Delete** (`delete_offer`, POST only) needs System Manager or Bol Manager plus Item read permission (as
+  with the Brand operator, ADR-007). It writes with `db_set`, so unticking *Sell on bol* doesn't queue a sync.

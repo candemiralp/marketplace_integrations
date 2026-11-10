@@ -8,6 +8,7 @@ from frappe.tests.utils import FrappeTestCase
 
 from marketplace_integrations.bol.api.errors import BolAuthError, BolTransientError
 from marketplace_integrations.bol.doctype.bol_settings import bol_settings
+from marketplace_integrations.bol.tests.utils import make_price_list
 
 # These tests need no Company; ERPNext's Company test records need ERPNext's full test setup.
 test_ignore = ["Company"]
@@ -82,3 +83,44 @@ class TestBolSettings(FrappeTestCase):
 		with patch.object(bol_settings, "BolClient") as client, self.assertRaises(frappe.PermissionError):
 			doc.test_connection()
 		client.assert_not_called()
+
+
+class TestOfferSyncSettings(FrappeTestCase):
+	def setUp(self):
+		self.addCleanup(frappe.db.rollback)
+
+	def _settings(self, **values):
+		doc = frappe.get_single("Bol Settings")
+		doc.update(
+			{
+				"enabled": 0,
+				"sync_offers": 1,
+				"price_list": make_price_list(),
+				"default_min_days": 1,
+				"default_max_days": 2,
+				**values,
+			}
+		)
+		return doc
+
+	def test_valid(self):
+		self._settings().validate()
+
+	def test_off_needs_nothing(self):
+		self._settings(sync_offers=0, price_list=None, default_max_days=0).validate()
+
+	def test_needs_a_price_list(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Price List"):
+			self._settings(price_list=None).validate()
+
+	def test_needs_default_max_days(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Max Days"):
+			self._settings(default_min_days=0, default_max_days=0).validate()
+
+	def test_buying_price_list_rejected(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "selling"):
+			self._settings(price_list=make_price_list("_Test bol Buying", selling=0)).validate()
+
+	def test_price_list_in_another_currency_rejected(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "EUR"):
+			self._settings(price_list=make_price_list("_Test bol USD", currency="USD")).validate()

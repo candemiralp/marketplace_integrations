@@ -73,6 +73,7 @@ def discard_pending_logs():
 TEST_UOM = "_Test bol UOM"
 TEST_ITEM_GROUP = "_Test bol Item Group"
 TEST_BRAND = "_Test bol Brand"
+TEST_PRICE_LIST = "_Test bol Price List"
 OPERATOR_ID = "0c6573a2-a80c-48b7-a03e-d5939f1173fa"
 
 
@@ -116,4 +117,24 @@ def make_item(item_code: str, *barcodes, **values):
 			"barcodes": rows,
 			**values,
 		}
+	).insert()
+
+
+def make_price_list(name: str = TEST_PRICE_LIST, selling: int = 1, currency: str = "EUR") -> str:
+	if not frappe.db.exists("Price List", name):
+		frappe.get_doc(
+			{
+				"doctype": "Price List",
+				"price_list_name": name,
+				"selling": selling,
+				"buying": int(not selling),
+				"currency": currency,
+			}
+		).insert()
+	return name
+
+
+def make_item_price(item_code: str, rate: float, price_list: str = TEST_PRICE_LIST):
+	return frappe.get_doc(
+		{"doctype": "Item Price", "item_code": item_code, "price_list": price_list, "price_list_rate": rate}
 	).insert()

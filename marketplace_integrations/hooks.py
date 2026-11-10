@@ -44,7 +44,7 @@ required_apps = ["erpnext", "ecommerce_integrations"]
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
-doctype_js = {"Brand": "public/js/brand.js"}
+doctype_js = {"Brand": "public/js/brand.js", "Item": "public/js/item.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -157,7 +157,15 @@ after_migrate = "marketplace_integrations.install.after_migrate"
 # Hook on document methods and events
 
 doc_events = {
-	"Item": {"validate": "marketplace_integrations.bol.catalog.validate_item"},
+	"Item": {
+		"validate": "marketplace_integrations.bol.catalog.validate_item",
+		"on_update": "marketplace_integrations.bol.offers.on_item_update",
+	},
+	"Item Price": {
+		"on_update": "marketplace_integrations.bol.offers.on_item_price_change",
+		"on_trash": "marketplace_integrations.bol.offers.on_item_price_change",
+	},
+	"Brand": {"on_update": "marketplace_integrations.bol.offers.on_brand_update"},
 }
 
 # doc_events = {
@@ -177,7 +185,10 @@ scheduler_events = {
 	"cron": {
 		"* * * * *": ["marketplace_integrations.bol.process_status.poll_pending"],
 	},
-	"daily": ["marketplace_integrations.bol.process_status.delete_old_processes"],
+	"daily": [
+		"marketplace_integrations.bol.process_status.delete_old_processes",
+		"marketplace_integrations.bol.offers.reconcile_offers",
+	],
 }
 
 # scheduler_events = {
