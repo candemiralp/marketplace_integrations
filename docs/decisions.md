@@ -525,3 +525,51 @@ options, the recommended parcel at 4.41 and a TNT_BRIEF mailbox label at 2.88), 
 - **Demo:** the expiry check is skipped (its options expired in 2020); its process never finishes and its "PDF" isn't
   one, so on the demo a label stays *Requested*. The flows are covered by tests against an in-memory fake.
 - The form shows **Get bol label** only where it applies: the DN's `onload` hook sets `__onload.bol_label_allowed`.
+
+---
+
+## ADR-013 — Cancellations (story 10)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/retailer-api-v10.json` (Retailer API v10, Orders),
+ERPNext 15.124.5 and the demo environment.
+
+| Story says | Spec / ERPNext / demo says | Decision |
+|---|---|---|
+| `PUT /retailer/orders/cancellation {orderItems: [{orderItemId, reasonCode}]}` → 202 | Confirmed (`CancellationRequest`, 202 ProcessStatus, 400 Problem), but **`orderItems` has `maxItems: 1`** | One PUT and one Bol Process per line. Payload `{so_detail, order_item_id}` instead of the story's lists. |
+| "Check whether a cancellation covers the whole order item or a quantity" | No quantity field: the **whole order item** (all its open units) | Cancel on bol offers only lines with nothing delivered; on success the whole line qty is taken off. |
+| `reasonCode` enum | The 12 codes, written in the spec as **one comma-joined string** (a spec bug) | Kept as `mappers/cancellation.REASON_CODES`; the form gets them through `__onload`. |
+| Use the OPEN list's data; fetch the detail when it lacks the fields | `ReducedOrderItem` has `cancellationRequest`, `quantityCancelled`, `quantityShipped`, `quantity` (all required); the **demo list has them too** | `orders.open_orders` keeps the list entries; the detail is fetched only for an entry without the fields. |
+| `apply_cancelled_qty(so, item_id, new_cancelled)` | A whole order cancelled line by line would first remove lines one at a time, then cancel | `apply_cancelled_qty(so_name, {order_item_id: quantityCancelled})`: one call per order, one `update_child_qty_rate` (or one cancel). |
+| Reduce the line with `update_child_qty_rate` | It refuses qty 0 unless *Allow zero qty in Sales Order*; rows **left out** of `trans_items` are deleted (after ERPNext's own delivered/billed checks); a qty below `delivered_qty` is refused | **Owner decision:** a line bol cancels completely (other lines remaining) is **removed**, recorded in a comment. A line is never taken below its delivered qty: logged (`log_once`) and commented, the line left as it is, other lines still applied. |
+| Cancel the SO when everything is cancelled | A draft (*Submit Orders* off) can't be cancelled | **Owner decision:** a draft is edited in place; a draft whose every line is cancelled is **deleted**, with a Success entry in the integration log (its timeline goes with it). |
+| Seller cancel 400 → re-sync | The 400 can come on the PUT, or as a FAILURE process | Both re-sync: GET the order, apply it. A PUT 400 doesn't throw, so the re-sync commits; the dialog lists the failures. |
+
+**Decisions.**
+- **qty is net of bol's cancellations.** The import already leaves cancelled units out, so it now also stores
+  `bol_qty_cancelled = quantityCancelled`: only what bol cancels later is taken off. The request flag isn't set at
+  import; the next poll sets it and makes the ToDo.
+- **Requests**: `bol_cancellation_requested` set on the line, a comment, and a ToDo for *Notify User* (new Bol Settings
+  field), unless that user already has an open ToDo on the SO. Only for lines bol still has open. No user → comment only.
+- **Savepoints**: requests and quantities each in their own savepoint per SO; a failure (e.g. `update_child_qty_rate`
+  refusing because of a stock reservation) is rolled back, logged once per 6 h (`bol:failed:cancellation:{so}`) with a
+  comment, and retried on the next poll. One commit per SO.
+- **Daily check** (`sync_recent_orders`): SOs with `bol_order_id`, not cancelled, `per_delivered < 100`, not Closed,
+  created in the last 30 days: GET each order and apply it.
+- **Cancel on bol**: Bol Manager/System Manager **and** SO write permission (as Retry, ADR-011). The SO is locked first;
+  a line with an unfinished cancellation process is refused. PUT is retried by the client on a transient error; a
+  duplicate is refused by bol (400) and re-synced. Errors per line are collected: nothing is thrown once a line has
+  been tracked (that would roll back its Bol Process). Only when nothing was sent and nothing re-synced is it a
+  `ValidationError`.
+- **Handlers**: success applies `bol_qty_cancelled + qty` for the line (a row already removed by the poll = done);
+  failure re-syncs (process_status has logged and commented bol's message). A bol error in the re-sync is logged once,
+  not raised.
+- **Guard**: `Sales Order.before_cancel` refuses a bol SO with a line still open (`qty > delivered_qty`) while Import
+  Orders is on; the integration's own cancel sets `flags.bol_cancelled`.
+- **No new toggle**: everything runs under *Import Orders* (no speculative settings, overview §4.5).
+
+**Demo environment (checked live, `dev.localhost`).** The OPEN list's items carry all cancellation fields (every
+demo item is shipped already). The cancellation PUT answers a canned 202 `CANCEL_ORDER` ProcessStatus with
+`entityId` = the order item id, **for any order item id**, and **always with the same `processStatusId`**. On the demo a
+second line therefore shares the first line's Bol Process (`track` is idempotent per id), and, like every demo
+process, it stays `PENDING`. Production ids are unique per request. The flows are covered by tests against an
+in-memory fake.

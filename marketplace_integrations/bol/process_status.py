@@ -37,6 +37,7 @@ HANDLERS: dict[str, tuple[Callable, Callable]] = {}
 HANDLER_MODULES: tuple[str, ...] = (
 	"marketplace_integrations.bol.shipments",
 	"marketplace_integrations.bol.labels",
+	"marketplace_integrations.bol.cancellations",
 )
 
 
