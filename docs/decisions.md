@@ -114,3 +114,54 @@ No production site ever had it, so no patch is needed.
 - The dev container installs `pre-commit` via `uv tool install` (dev-env Dockerfile).
 - CI is pinned to `version-15` for frappe, erpnext and ecommerce_integrations, with Python 3.11 and
   Node 20 to match the dev image.
+
+---
+
+## ADR-004 — bol auth, base paths and error format, checked against the spec (story 02)
+
+**Context.** Checked on 2026-11-10 against the Retailer API v10 OpenAPI spec
+(`docs/bol-openapi/retailer-api-v10.json`), the Authentication and Demo pages, and the
+process-status v10, offers v11 and economic-operators v1 definitions.
+
+| Story / overview says | Spec / docs say | Decision |
+|---|---|---|
+| `POST https://login.bol.com/token?grant_type=client_credentials` | `grant_type=client_credentials` as a **form body** parameter, `Content-Type: application/x-www-form-urlencoded`, Basic auth, `Accept: application/json` | Send it as form data. Bad credentials give **401** (confirmed live: `{"error":"invalid_client"}`). `expires_in` is 299 s. bol IP-bans clients that fetch a token per call, so the token is cached for `expires_in - 30`. |
+| Base URLs `…/retailer` and `…/retailer-demo` | Demo mirrors **each API root**: `/retailer-demo/…`, `/shared-demo/…` | `BolClient.request` takes the full spec path (`/retailer/orders`) and, in Demo, appends `-demo` to the first segment. Code paths read exactly like the spec. |
+| Process status at `/retailer/process-status/{id}` (overview §2) | **`/shared/process-status/{id}`** (process-status v10) | Story 03 uses `/shared/process-status/{id}`. |
+| Media type `application/vnd.retailer.v{N}+json` | Economic operators use **`application/vnd.economic-operator.v1+json`** | Story 04 passes it as `accept`. When `accept` is a JSON type, Content-Type follows it. |
+| Errors as `application/vnd.problem+json` | Error bodies use the resource's media type (`application/vnd.retailer.v10+json`). The Problem has `type, title, status, detail, host, instance, violations[{name, reason}]` | The client parses any JSON error body as a Problem. |
+| — | The spec documents only 200/202/207/400/404/406/415 | 401/403/429/5xx handling follows the functional docs and overview §4.1. Any other 4xx (406, 415, …) raises a plain `BolError` and isn't retried. |
+| Test connection: orders list with `page=1` | The demo only answers its hard-coded requests | Test connection sends `GET /retailer/orders?fulfilment-method=FBR&status=OPEN` (a demo example; page 1 is the default). |
+
+---
+
+## ADR-005 — Logging adapter: deferred writes, callers log failures (story 02)
+
+**Context.** See ADR-001: `create_log` always commits, takes the traceback from the exception
+currently being handled, and has no reference fields. A commit while a record is being processed
+persists half-finished work and drops the record's savepoint (overview §4.1 rule 4). Logging every
+failure inside the client would also defeat `log_once` (rule 6).
+
+**Decision.**
+- `bol/log.py` builds the `Ecommerce Integration Log` doc itself (same field semantics as
+  `create_log`: JSON dumped with `sort_keys`, `indent=4`; status `Success`/`Error`) and **writes it
+  when the caller's transaction ends**. It queues the entry on `frappe.local` and registers one
+  flush on `frappe.db.after_commit` and `after_rollback`. Frappe v15's `commit()` clears
+  `after_rollback` and `rollback()` clears `after_commit`, so the flush runs once. It inserts the
+  logs (`ignore_links`, because the referenced document may have been rolled back) and commits only
+  them. The result: logs survive a rollback, logging never commits the caller's work, and a
+  savepoint rollback leaves queued logs in place. This is the one deviation from the story, which
+  says to go through `create_log`.
+- The traceback comes from the error object, not from `sys.exc_info()`.
+- Reference document: custom fields `bol_reference_doctype` / `bol_reference_name` on Ecommerce
+  Integration Log. `reference=(doctype, name)` everywhere.
+- **The client logs successful calls** (non-GET always, GET only with *Debug Logging*). **Callers
+  log failures** after rolling back: `log_call(**err.details, error=err, reference=…)`, or
+  `log_once(kind, key, …)` for recurring failures. `BolError.details` uses `log_call`'s keyword
+  names and is already redacted.
+- Bol Manager read access to the log: `install.ensure_log_permission()` calls
+  `frappe.permissions.add_permission`, which first copies the standard perms to Custom DocPerm.
+  Consequence: later upstream changes to that DocType's standard perms no longer apply on our sites.
+  Re-check after upgrading `ecommerce_integrations`.
+- Test site: `test_bol_settings.py` sets `test_ignore = ["Company"]`. Without it, the runner builds
+  ERPNext Company test records, which need ERPNext's full test setup (`Warehouse Type: Transit`).

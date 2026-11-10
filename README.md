@@ -29,6 +29,48 @@ Installing (and every `bench migrate`) creates the **Bol Manager** role and appl
 fields. Both steps are idempotent. Bol Manager has no permissions of its own: each feature's DocTypes
 grant them.
 
+### How to use / operate
+
+**Connect to bol**
+
+1. Create API credentials in the bol seller dashboard (*Instellingen → Diensten → API instellingen*).
+   In this dev environment use **demo** credentials only.
+2. Open **Bol Settings** (System Manager or Bol Manager). Fill in *Client ID*, *Client Secret*,
+   *Company*. Choose *Environment* (*Demo* by default).
+3. Save, then click **Test Connection**. It fetches a token and lists open orders. An error message
+   says whether the credentials were rejected or bol couldn't be reached.
+4. Tick **Enabled** to switch the integration on. Saving never calls bol.
+
+**Logs.** Every failed bol call and every successful write (POST/PUT/PATCH/DELETE) is recorded in
+**Ecommerce Integration Log** (integration *Bol*), with request, response, traceback and the related
+document (*Reference DocType / Name*). Tick **Debug Logging** to log successful GETs too. Turn it
+off again: logs hold buyer data. Authorization headers, tokens and the client secret are masked.
+Only System Manager and Bol Manager can read the logs.
+
+**Tokens** are cached in Redis only, until 30 s before they expire. Saving Bol Settings clears the
+cached token.
+
+**For developers** (details in `docs/decisions.md`, ADR-004/005):
+
+```python
+from marketplace_integrations.bol.api.client import get_client
+from marketplace_integrations.bol.api.errors import BolError
+from marketplace_integrations.bol.log import log_call, log_once
+
+client = get_client()  # raises BolError when the integration is disabled
+try:
+    orders = client.request("GET", "/retailer/orders", version=10, params={"status": "OPEN"})
+except BolError as err:
+    frappe.db.rollback(save_point="record")  # undo your own work first
+    log_once("order", order_id, **err.details, error=err, reference=("Sales Order", so_name))
+```
+
+- Pass the path exactly as bol's spec writes it; the client handles the demo prefix, retries
+  (§4.1), token refresh and error mapping.
+- `err.ambiguous` is `True` when a POST may have been processed. Check bol's state before trying
+  again.
+- Logs are written when the transaction commits or rolls back, never in the middle of it.
+
 ### Development
 
 In the dev environment, bench runs inside a container. Use the `make` targets from the

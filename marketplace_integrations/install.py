@@ -3,22 +3,26 @@
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.installer import add_module_defs
+from frappe.permissions import add_permission
 
 from marketplace_integrations.setup.custom_fields import CUSTOM_FIELDS
 
 APP_NAME = "marketplace_integrations"
 BOL_MANAGER = "Bol Manager"
+INTEGRATION_LOG = "Ecommerce Integration Log"
 
 
 def after_install():
 	ensure_role()
 	ensure_custom_fields()
+	ensure_log_permission()
 
 
 def after_migrate():
 	ensure_module_defs()
 	ensure_role()
 	ensure_custom_fields()
+	ensure_log_permission()
 
 
 def ensure_module_defs():
@@ -37,3 +41,11 @@ def ensure_role():
 
 def ensure_custom_fields():
 	create_custom_fields(CUSTOM_FIELDS, update=True)
+
+
+def ensure_log_permission():
+	# Integration logs hold buyer PII: readable by System Manager (standard) and Bol Manager only.
+	# add_permission first copies the standard perms into Custom DocPerm (see ADR-005).
+	if frappe.db.exists("Custom DocPerm", {"parent": INTEGRATION_LOG, "role": BOL_MANAGER, "permlevel": 0}):
+		return
+	add_permission(INTEGRATION_LOG, BOL_MANAGER, permlevel=0, ptype="read")
