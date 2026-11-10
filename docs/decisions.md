@@ -676,6 +676,10 @@ Shipments), bol's functional pages *Invoices* and *Customer invoices*, the demo 
   process is unfinished. An ambiguous POST isn't repeated blindly: the next run sees whether bol still lists the
   request (bol refuses a second upload with a 400). No DN/SI → `log_once("invoice_request", shipment)` (+ DN comment).
   The buyer's billing details from the request aren't stored or logged (PII).
+- **Notification** (owner request, after the story): one open ToDo per requested shipment for *Notify User*, on the
+  SI (else the DN, else no reference), found again by a `[bol shipment {id}]` key in its description because bol
+  lists the request every day until it has the invoice. The upload's success handler closes it, so open ToDos are
+  the requests a person must handle. No user set → no ToDo (as for returns, ADR-014).
 - **Print format "bol Sales Invoice"** (owner decision; standard, module Bol): the bol buyer (company, name, address,
   VAT and KvK numbers) is the invoice party, not the *bol.com* customer. Labels are **Dutch text**, not `_()`: bol
   requires the language of the buyer's country (NL, BE) whatever the system language. Prices are shown incl. VAT

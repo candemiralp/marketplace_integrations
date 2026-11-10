@@ -59,7 +59,9 @@ class FakeBol:
 		if (method, path) == ("POST", process_status.PATH):
 			ids = [query["processStatusId"] for query in json["processStatusQueries"]]
 			return {"processStatuses": [copy.deepcopy(self.processes[i]) for i in ids if i in self.processes]}
-		self.calls.append({"method": method, "path": path, "params": params, "accept": accept, "files": files})
+		self.calls.append(
+			{"method": method, "path": path, "params": params, "accept": accept, "files": files}
+		)
 		error = self.errors.pop((method, path), None)
 		if error:
 			raise error
@@ -86,7 +88,9 @@ class FakeBol:
 			return copy.deepcopy(self.processes[process_id])
 		raise AssertionError(f"Unexpected call {method} {path}")
 
-	def add_invoice(self, invoice_id: str, lines: list[dict], net: float, vat: float, pdf: bytes = PDF) -> dict:
+	def add_invoice(
+		self, invoice_id: str, lines: list[dict], net: float, vat: float, pdf: bytes = PDF
+	) -> dict:
 		item = copy.deepcopy(INVOICES["invoiceListItems"][0])
 		item.update(invoiceId=invoice_id, issueDate=ISSUED)
 		total = item["legalMonetaryTotal"]
@@ -129,13 +133,16 @@ class InvoiceTestCase(FrappeTestCase):
 			auto_invoice=1,
 			receivable_account=self.accounts.receivable_account,
 			upload_invoices=1,
+			notify_user="Administrator",
 			import_bol_invoices=1,
 			supplier=self.accounts.supplier,
 			purchase_tax_template=self.accounts.purchase_tax_template,
 			default_expense_account=self.accounts.default_expense_account,
 			bol_invoices_until=None,
 			invoice_account_map=[
-				frappe._dict(bol_line_type="COMMISSION", expense_account=self.accounts.commission_account, item=None)
+				frappe._dict(
+					bol_line_type="COMMISSION", expense_account=self.accounts.commission_account, item=None
+				)
 			],
 		)
 		self._start(patch.object(invoices, "get_client", return_value=self.bol))
@@ -184,13 +191,19 @@ class InvoiceTestCase(FrappeTestCase):
 		dn.db_set({"bol_shipment_status": status, "bol_shipment_id": shipment_id})
 		return frappe.get_doc(DN, dn.name)
 
-	def _returned(self, dn, handling_result: str = "RETURN_RECEIVED", status: str = returns.REPORTED, qty: int = 1):
+	def _returned(
+		self, dn, handling_result: str = "RETURN_RECEIVED", status: str = returns.REPORTED, qty: int = 1
+	):
 		"""A submitted bol return of `qty` shirts of `dn`, in `status` at bol."""
 		ret = make_sales_return(dn.name)
 		ret.set("items", [row for row in ret.items if row.item_code == SHIRT])
 		ret.items[0].qty = -qty
 		ret.update(
-			{"bol_rma_id": f"RMA-{next(self.rma_ids)}", "bol_expected_qty": qty, "bol_handling_result": handling_result}
+			{
+				"bol_rma_id": f"RMA-{next(self.rma_ids)}",
+				"bol_expected_qty": qty,
+				"bol_handling_result": handling_result,
+			}
 		)
 		ret.insert()
 		ret.submit()
@@ -213,7 +226,9 @@ class InvoiceTestCase(FrappeTestCase):
 		return [html.unescape(content) for content in comments]
 
 	def _error_logs(self) -> list[dict]:
-		return [log for log in getattr(frappe.local, "bol_pending_logs", None) or [] if log["status"] == "Error"]
+		return [
+			log for log in getattr(frappe.local, "bol_pending_logs", None) or [] if log["status"] == "Error"
+		]
 
 	def _purchase_invoices(self) -> list:
 		return [
@@ -234,7 +249,9 @@ class TestSalesInvoice(InvoiceTestCase):
 		self.assertEqual(si.debit_to, self.accounts.receivable_account)
 		self.assertEqual(si.bol_order_id, so.bol_order_id)
 		self.assertEqual(si.bol_buyer_name, so.bol_buyer_name)
-		self.assertEqual((getdate(si.posting_date), str(si.posting_time)), (getdate(dn.posting_date), str(dn.posting_time)))
+		self.assertEqual(
+			(getdate(si.posting_date), str(si.posting_time)), (getdate(dn.posting_date), str(dn.posting_time))
+		)
 		self.assertEqual(si.grand_total, so.grand_total)
 		self.assertEqual(
 			[(row.item_code, row.qty, row.rate) for row in si.items],
@@ -448,8 +465,15 @@ class TestPrintFormat(InvoiceTestCase):
 class TestPurchaseInvoices(InvoiceTestCase):
 	def _fees(self, invoice_id: str = "4500000001", **values):
 		"""A bol invoice: 12.00 commission, 2.00 labels (unmapped), 50.00 turnover paid out. bol's totals include it."""
-		lines = [line("COMMISSION", 10, 2.1), line("COMMISSION", 2, 0.42), line("SHIPMENT_LABEL", 2, 0.42), line("TURNOVER", -50)]
-		return self.bol.add_invoice(invoice_id, lines, net=values.get("net", -36.0), vat=values.get("vat", 2.94))
+		lines = [
+			line("COMMISSION", 10, 2.1),
+			line("COMMISSION", 2, 0.42),
+			line("SHIPMENT_LABEL", 2, 0.42),
+			line("TURNOVER", -50),
+		]
+		return self.bol.add_invoice(
+			invoice_id, lines, net=values.get("net", -36.0), vat=values.get("vat", 2.94)
+		)
 
 	def test_bol_invoice_becomes_a_draft_purchase_invoice_with_its_pdf(self):
 		self._fees()
@@ -458,7 +482,9 @@ class TestPurchaseInvoices(InvoiceTestCase):
 
 		(pi,) = self._purchase_invoices()
 		self.assertEqual(pi.docstatus, 0)
-		self.assertEqual((pi.supplier, pi.bill_no, pi.bol_invoice_id), (self.accounts.supplier, "4500000001", "4500000001"))
+		self.assertEqual(
+			(pi.supplier, pi.bill_no, pi.bol_invoice_id), (self.accounts.supplier, "4500000001", "4500000001")
+		)
 		self.assertEqual((str(pi.bill_date), str(pi.posting_date)), (ISSUED, ISSUED))
 		self.assertEqual(pi.is_return, 0)
 		self.assertEqual(
@@ -517,7 +543,9 @@ class TestPurchaseInvoices(InvoiceTestCase):
 	def test_one_failing_invoice_doesnt_block_the_others_and_holds_the_window(self):
 		self._fees("4500000001")
 		self._fees("4500000002")
-		self.bol.errors[("GET", f"{invoices.INVOICES_PATH}/4500000001/specification")] = BolServerError("bol down")
+		self.bol.errors[("GET", f"{invoices.INVOICES_PATH}/4500000001/specification")] = BolServerError(
+			"bol down"
+		)
 		until = add_days(today(), -3)
 		self.settings.bol_invoices_until = until
 
@@ -534,7 +562,9 @@ class TestPurchaseInvoices(InvoiceTestCase):
 		self.assertEqual(frappe.db.get_single_value("Bol Settings", "bol_invoices_until"), getdate(today()))
 
 	def test_a_pdf_that_isnt_one_fails_the_invoice(self):
-		self.bol.add_invoice("4500000003", [line("COMMISSION", 1, 0.21)], net=1, vat=0.21, pdf=b"THIS IS A FAKE PDF")
+		self.bol.add_invoice(
+			"4500000003", [line("COMMISSION", 1, 0.21)], net=1, vat=0.21, pdf=b"THIS IS A FAKE PDF"
+		)
 
 		invoices.poll_bol_invoices()
 
@@ -614,6 +644,64 @@ class TestInvoiceUploads(InvoiceTestCase):
 		dn = self._shipped(shipment_id=shipment_id)
 		return invoices.invoice_delivery_note(dn.name)
 
+	def _todos(self, shipment_id: str) -> list[dict]:
+		return frappe.get_all(
+			"ToDo",
+			filters={"description": ("like", f"%[bol shipment {shipment_id}]%")},
+			fields=["allocated_to", "status", "reference_type", "reference_name", "description"],
+		)
+
+	def _finish_uploads(self):
+		for process_id, process in self.bol.processes.items():
+			process.update(status="SUCCESS")
+			process_status.check_one(process_id)
+
+	def test_incoming_request_gives_the_notify_user_one_todo(self):
+		si_name = self._invoiced_shipment()
+		self.bol.add_request("S-1")
+
+		invoices.upload_requested_invoices()
+		# bol lists the request until it has processed the upload.
+		invoices.upload_requested_invoices()
+
+		(todo,) = self._todos("S-1")
+		self.assertEqual(
+			(todo.allocated_to, todo.status, todo.reference_type, todo.reference_name),
+			("Administrator", "Open", SI, si_name),
+		)
+		self.assertIn("bol order 4691862037", todo.description)
+
+	def test_todo_closes_once_bol_has_the_upload(self):
+		self._invoiced_shipment()
+		self.bol.add_request("S-1")
+		invoices.upload_requested_invoices()
+
+		self._finish_uploads()
+
+		self.assertEqual([todo.status for todo in self._todos("S-1")], ["Closed"])
+
+	def test_todo_stays_open_when_the_request_needs_a_person(self):
+		dn = self._shipped(shipments.PENDING, shipment_id="S-3")
+		self.bol.add_request("S-3")
+		self.bol.add_request("S-UNKNOWN")
+
+		invoices.upload_requested_invoices()
+
+		(todo,) = self._todos("S-3")
+		self.assertEqual((todo.status, todo.reference_type, todo.reference_name), ("Open", DN, dn.name))
+		(todo,) = self._todos("S-UNKNOWN")
+		self.assertEqual((todo.status, todo.reference_type, todo.reference_name), ("Open", None, None))
+
+	def test_no_notify_user_no_todo(self):
+		self._invoiced_shipment()
+		self.bol.add_request("S-1")
+		self.settings.notify_user = None
+
+		invoices.upload_requested_invoices()
+
+		self.assertEqual(self._todos("S-1"), [])
+		self.assertEqual(len(self.bol.calls_to("POST", invoices.UPLOAD_PATH)), 1)
+
 	def test_requested_invoice_is_uploaded_and_followed(self):
 		si_name = self._invoiced_shipment()
 		self.bol.add_request("S-1")
@@ -680,12 +768,16 @@ class TestInvoiceUploads(InvoiceTestCase):
 	def test_bol_refusing_the_upload_is_logged_and_commented(self):
 		si_name = self._invoiced_shipment()
 		self.bol.add_request("S-1")
-		self.bol.errors[("POST", f"{invoices.UPLOAD_PATH}/S-1")] = BolValidationError("Bad Request", "Invoice exists")
+		self.bol.errors[("POST", f"{invoices.UPLOAD_PATH}/S-1")] = BolValidationError(
+			"Bad Request", "Invoice exists"
+		)
 
 		invoices.upload_requested_invoices()
 
 		self.assertEqual(len(self._error_logs()), 1)
-		self.assertEqual(frappe.get_all(process_status.DOCTYPE, filters={"handler": invoices.UPLOAD_HANDLER}), [])
+		self.assertEqual(
+			frappe.get_all(process_status.DOCTYPE, filters={"handler": invoices.UPLOAD_HANDLER}), []
+		)
 		self.assertTrue(any("Invoice exists" in c for c in self._comments(SI, si_name)))
 
 	def test_demo_reads_only_open_requests(self):

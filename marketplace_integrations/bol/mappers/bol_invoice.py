@@ -90,7 +90,12 @@ def group_lines(lines: list[dict]) -> dict[str, dict]:
 
 
 def to_purchase_invoice(
-	item: dict, lines: list[dict], account_map: dict[str, dict], default_account: str, precision: int, timezone: str
+	item: dict,
+	lines: list[dict],
+	account_map: dict[str, dict],
+	default_account: str,
+	precision: int,
+	timezone: str,
 ) -> dict:
 	"""The draft Purchase Invoice for a listed bol invoice and its specification lines.
 
