@@ -70,7 +70,9 @@ def before_submit_delivery_note(doc, method=None):
 			title=_("bol Label"),
 		)
 	if not ships_itself(shipment_lines(doc)):
-		message = _("bol ships these items (Verzenden via bol). Get the bol label (bol → Get bol label) first.")
+		message = _(
+			"bol ships these items (Verzenden via bol). Get the bol label (bol → Get bol label) first."
+		)
 		if not labels_on():
 			message += " " + _("Switch on Use Verzenden via bol in Bol Settings for that.")
 		frappe.throw(message, title=_("bol Label"))
@@ -130,7 +132,9 @@ def request_label(dn_name: str) -> dict:
 	dn.db_set("bol_label_status", REQUESTED, notify=True)
 	dn.add_comment(
 		"Comment",
-		_("bol label requested: {0} ({1}), {2} excl. VAT. bol charges it only when the shipment is confirmed.").format(
+		_(
+			"bol label requested: {0} ({1}), {2} excl. VAT. bol charges it only when the shipment is confirmed."
+		).format(
 			option.get("labelDisplayName") or option.get("labelType"),
 			option.get("transporterCode"),
 			fmt_money((option.get("labelPrice") or {}).get("totalPrice"), currency="EUR"),
@@ -170,7 +174,13 @@ def on_label_success(process, entity_id, payload):
 		return
 	user = payload.get("user")
 	if not entity_id:
-		_failed(dn, _("bol made the label but didn't say its id. Get a new bol label: an unused label isn't charged."), user)
+		_failed(
+			dn,
+			_(
+				"bol made the label but didn't say its id. Get a new bol label: an unused label isn't charged."
+			),
+			user,
+		)
 		return
 	dn.db_set({"bol_shipping_label_id": entity_id, "bol_label_transporter": payload.get("transporter")})
 	try:
@@ -192,7 +202,9 @@ def on_label_failure(process, message, payload):
 	dn = frappe.get_doc(DOCTYPE, process.reference_name)
 	if dn.bol_label_status != READY:
 		dn.db_set("bol_label_status", FAILED, notify=True)
-		_notify(payload.get("user"), _("bol couldn't make the label for {0}: {1}").format(dn.name, message), "red")
+		_notify(
+			payload.get("user"), _("bol couldn't make the label for {0}: {1}").format(dn.name, message), "red"
+		)
 
 
 process_status.register(HANDLER, on_label_success, on_label_failure)
@@ -205,7 +217,8 @@ def _label_lines(dn, settings) -> list[dict]:
 	"""The Delivery Note's lines, once it's sure a label may be bought for them."""
 	if dn.docstatus != 0 or dn.is_return or not dn.bol_order_id:
 		frappe.throw(
-			_("A bol label can only be bought for a draft Delivery Note of a bol order."), title=_("Not Allowed")
+			_("A bol label can only be bought for a draft Delivery Note of a bol order."),
+			title=_("Not Allowed"),
 		)
 	if dn.bol_label_status in (REQUESTED, READY):
 		frappe.throw(
@@ -264,9 +277,13 @@ def _request_failed(error: BolError) -> str:
 	if isinstance(error, BolMappingError) and error.reason == "no_option":
 		return _("No VVB option available — check the package restrictions.")
 	if isinstance(error, BolValidationError):
-		return _("bol rejected the label request: {0}").format(format_violations(error.violations) or str(error))
+		return _("bol rejected the label request: {0}").format(
+			format_violations(error.violations) or str(error)
+		)
 	if error.ambiguous:
-		return _("bol may have made the label, but its answer didn't arrive. Try again: an unused label isn't charged.")
+		return _(
+			"bol may have made the label, but its answer didn't arrive. Try again: an unused label isn't charged."
+		)
 	return _("bol label not requested: {0}").format(str(error))
 
 

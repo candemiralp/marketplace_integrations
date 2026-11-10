@@ -16,7 +16,13 @@ from marketplace_integrations.bol.api.errors import (
 	BolTransientError,
 	BolValidationError,
 )
-from marketplace_integrations.bol.tests.test_shipments import BAG_ITEM, DN, SHIRT_ITEM, FakeShipments, ShipmentTestCase
+from marketplace_integrations.bol.tests.test_shipments import (
+	BAG_ITEM,
+	DN,
+	SHIRT_ITEM,
+	FakeShipments,
+	ShipmentTestCase,
+)
 from marketplace_integrations.bol.tests.utils import BOL_MANAGER, make_bol_manager
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -71,7 +77,9 @@ class LabelTestCase(ShipmentTestCase):
 		self.addCleanup(self._delete_label_files)
 
 	def _bol_dn(self, party: str = "BOL", **values):
-		return self._delivery_note(self._sales_order(party=party), submit=False, track_and_trace=None, **values)
+		return self._delivery_note(
+			self._sales_order(party=party), submit=False, track_and_trace=None, **values
+		)
 
 	def _requested_dn(self, **values):
 		dn = self._bol_dn(**values)
@@ -255,7 +263,9 @@ class TestDownload(LabelTestCase):
 		dn = self._undownloaded_dn()
 
 		self.assertEqual(self._label_state(dn), ("Requested", "label-1", "TNT"))
-		self.assertEqual(frappe.db.get_value(process_status.DOCTYPE, {"reference_name": dn.name}, "status"), "SUCCESS")
+		self.assertEqual(
+			frappe.db.get_value(process_status.DOCTYPE, {"reference_name": dn.name}, "status"), "SUCCESS"
+		)
 		self.assertIn("Download bol label again", self._comments(dn)[-1])
 		self.assertEqual(len(self._error_logs()), 1)
 		self.assertEqual(self._label_files(dn), [])
@@ -314,7 +324,9 @@ class TestDownload(LabelTestCase):
 		frappe.delete_doc(DN, dn.name)
 		self._finish()
 
-		self.assertEqual(frappe.db.get_value(process_status.DOCTYPE, {"reference_name": dn.name}, "status"), "SUCCESS")
+		self.assertEqual(
+			frappe.db.get_value(process_status.DOCTYPE, {"reference_name": dn.name}, "status"), "SUCCESS"
+		)
 
 
 class TestSubmit(LabelTestCase):
@@ -345,7 +357,9 @@ class TestSubmit(LabelTestCase):
 		shipments.confirm_shipment(dn.name)
 
 		(body,) = self.bol.posts()
-		self.assertEqual(body, {"orderItems": ITEMS, "shipmentReference": dn.name, "shippingLabelId": "label-1"})
+		self.assertEqual(
+			body, {"orderItems": ITEMS, "shipmentReference": dn.name, "shippingLabelId": "label-1"}
+		)
 
 	def test_own_items_on_a_bol_label_need_no_track_and_trace(self):
 		self.settings.vvb_for_retailer_items = 1
