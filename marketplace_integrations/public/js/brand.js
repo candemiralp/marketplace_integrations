@@ -5,7 +5,9 @@ frappe.ui.form.on("Brand", {
 		if (frm.is_new() || !frappe.user.has_role(["System Manager", "Bol Manager"])) {
 			return;
 		}
-		frm.add_custom_button(__("Select bol economic operator"), () => select_economic_operator(frm));
+		frm.add_custom_button(__("Select bol economic operator"), () =>
+			select_economic_operator(frm)
+		);
 	},
 });
 
@@ -19,7 +21,9 @@ function select_economic_operator(frm) {
 			const operators = r.message || [];
 			if (!operators.length) {
 				frappe.msgprint(
-					__("bol has no economic operators for this account. Create them in the bol seller dashboard.")
+					__(
+						"bol has no economic operators for this account. Create them in the bol seller dashboard."
+					)
 				);
 				return;
 			}
@@ -32,7 +36,10 @@ function select_economic_operator(frm) {
 						label: __("Economic Operator"),
 						reqd: 1,
 						default: frm.doc.bol_economic_operator_id,
-						options: operators.map((op) => ({ value: op.id, label: `${op.name} (${op.status})` })),
+						options: operators.map((op) => ({
+							value: op.id,
+							label: `${op.name} (${op.status})`,
+						})),
 					},
 				],
 				primary_action_label: __("Save"),

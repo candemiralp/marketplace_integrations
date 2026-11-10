@@ -176,15 +176,23 @@ class TestSetBrandEconomicOperator(EconomicOperatorTestCase):
 		result = catalog.set_brand_economic_operator(self.brand.name, OPERATOR_ID)
 
 		self.assertEqual(result, {"status": "VALID"})
-		self.assertEqual(frappe.db.get_value("Brand", self.brand.name, "bol_economic_operator_id"), OPERATOR_ID)
-		self.assertEqual(self.client.request.call_args.args, ("GET", f"/retailer/economic-operator/{OPERATOR_ID}"))
+		self.assertEqual(
+			frappe.db.get_value("Brand", self.brand.name, "bol_economic_operator_id"), OPERATOR_ID
+		)
+		self.assertEqual(
+			self.client.request.call_args.args, ("GET", f"/retailer/economic-operator/{OPERATOR_ID}")
+		)
 
 	def test_operator_that_is_not_valid_is_saved_with_its_status(self):
 		pending = OPERATORS["operators"][1]
 		self.client.request.return_value = pending
 
-		self.assertEqual(catalog.set_brand_economic_operator(self.brand.name, pending["id"]), {"status": "PENDING"})
-		self.assertEqual(frappe.db.get_value("Brand", self.brand.name, "bol_economic_operator_id"), pending["id"])
+		self.assertEqual(
+			catalog.set_brand_economic_operator(self.brand.name, pending["id"]), {"status": "PENDING"}
+		)
+		self.assertEqual(
+			frappe.db.get_value("Brand", self.brand.name, "bol_economic_operator_id"), pending["id"]
+		)
 
 	def test_unknown_operator(self):
 		self.client.request.side_effect = BolNotFoundError("Not found")
@@ -193,7 +201,9 @@ class TestSetBrandEconomicOperator(EconomicOperatorTestCase):
 			catalog.set_brand_economic_operator(self.brand.name, "1f2e3d4c-0000-0000-0000-000000000000")
 		self.assertIsNone(frappe.db.get_value("Brand", self.brand.name, "bol_economic_operator_id"))
 		[entry] = frappe.local.bol_pending_logs
-		self.assertEqual((entry["bol_reference_doctype"], entry["bol_reference_name"]), ("Brand", self.brand.name))
+		self.assertEqual(
+			(entry["bol_reference_doctype"], entry["bol_reference_name"]), ("Brand", self.brand.name)
+		)
 
 	def test_clear(self):
 		frappe.db.set_value("Brand", self.brand.name, "bol_economic_operator_id", OPERATOR_ID)
@@ -222,7 +232,9 @@ class TestSetBrandEconomicOperator(EconomicOperatorTestCase):
 			catalog.set_brand_economic_operator(self.brand.name, OPERATOR_ID)
 
 		has_permission.assert_called_once_with("Brand", "read", self.brand.name, throw=True)
-		self.assertEqual(frappe.db.get_value("Brand", self.brand.name, "bol_economic_operator_id"), OPERATOR_ID)
+		self.assertEqual(
+			frappe.db.get_value("Brand", self.brand.name, "bol_economic_operator_id"), OPERATOR_ID
+		)
 
 	def test_requires_a_bol_role(self):
 		frappe.set_user("Guest")

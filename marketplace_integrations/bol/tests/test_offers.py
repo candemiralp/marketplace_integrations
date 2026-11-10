@@ -245,6 +245,7 @@ class TestAdoptExistingOffers(AdoptTestCase):
 		self.assertEqual(self.realtime.call_args.args[1]["indicator"], "red")
 
 	def test_repeated_cursor_stops_the_job(self):
+		self.client.settings.environment = "Production"
 		make_item("_Test bol shirt", FOR_SALE["ean"])
 
 		with self.assertRaisesRegex(BolError, "same page cursor"):
@@ -254,6 +255,26 @@ class TestAdoptExistingOffers(AdoptTestCase):
 		self.assertEqual(len(self._mappings()), 1)
 		[entry] = self._logs()
 		self.assertEqual(entry["status"], "Error")
+
+	def test_repeated_cursor_ends_the_list_in_demo(self):
+		self.client.settings.environment = "Demo"
+		make_item("_Test bol shirt", FOR_SALE["ean"])
+
+		report = self._adopt(PAGE_1, PAGE_1)
+
+		self.assertEqual(report["pages"], 2)
+		self.assertEqual(self.client.request.call_count, 2)
+		[entry] = self._logs()
+		self.assertEqual(entry["status"], "Success")
+
+	def test_an_offer_seen_again_is_counted_once(self):
+		make_item("_Test bol shirt", FOR_SALE["ean"])
+
+		report = self._adopt({**PAGE_1, "offers": [FOR_SALE, ON_HOLD]}, single_page(ON_HOLD, FOR_SALE))
+
+		self.assertEqual((report["counts"]["adopted"], report["counts"]["unmatched"]), (1, 1))
+		self.assertEqual(report["unmatched"], [{"offerId": ON_HOLD["offerId"], "ean": ON_HOLD["ean"]}])
+		self.assertEqual(report["repeated"], 2)
 
 
 class TestEnqueueAdoption(FrappeTestCase):
@@ -289,7 +310,9 @@ class TestAdoptButton(FrappeTestCase):
 		self.settings.enabled = 1
 
 	def test_queues_the_job(self):
-		with patch("marketplace_integrations.bol.doctype.bol_settings.bol_settings.enqueue_adoption") as enqueue:
+		with patch(
+			"marketplace_integrations.bol.doctype.bol_settings.bol_settings.enqueue_adoption"
+		) as enqueue:
 			enqueue.return_value = True
 			self.assertEqual(self.settings.adopt_existing_offers(), {"queued": True})
 
@@ -297,7 +320,9 @@ class TestAdoptButton(FrappeTestCase):
 		self.settings.enabled = 0
 
 		with (
-			patch("marketplace_integrations.bol.doctype.bol_settings.bol_settings.enqueue_adoption") as enqueue,
+			patch(
+				"marketplace_integrations.bol.doctype.bol_settings.bol_settings.enqueue_adoption"
+			) as enqueue,
 			self.assertRaisesRegex(frappe.ValidationError, "Enable the bol integration"),
 		):
 			self.settings.adopt_existing_offers()
@@ -307,7 +332,9 @@ class TestAdoptButton(FrappeTestCase):
 		frappe.set_user("Guest")
 
 		with (
-			patch("marketplace_integrations.bol.doctype.bol_settings.bol_settings.enqueue_adoption") as enqueue,
+			patch(
+				"marketplace_integrations.bol.doctype.bol_settings.bol_settings.enqueue_adoption"
+			) as enqueue,
 			self.assertRaises(frappe.PermissionError),
 		):
 			self.settings.adopt_existing_offers()

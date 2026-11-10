@@ -22,7 +22,9 @@ def get_item_ean(item) -> str:
 	if not eans:
 		raise BolMappingError(f"Item {item.name} has no EAN barcode", reason="missing")
 	if len(eans) > 1:
-		raise BolMappingError(f"Item {item.name} has several EAN barcodes: {', '.join(eans)}", reason="several")
+		raise BolMappingError(
+			f"Item {item.name} has several EAN barcodes: {', '.join(eans)}", reason="several"
+		)
 	if not is_valid_gtin13(eans[0]):
 		raise BolMappingError(f"EAN {eans[0]} of item {item.name} is not a valid GTIN-13", reason="invalid")
 	return eans[0]

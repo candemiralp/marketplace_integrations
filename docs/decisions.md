@@ -262,6 +262,10 @@ failure inside the client would also defeat `log_once` (rule 6).
 - **Checked live on the demo environment** (read-only GETs): both list paths, the EO media type and
   the offer fields above are as the spec says. The demo ignores `page-size` (it always answers 25).
   It also returns the **same `nextCursor` on every page** and the same operator on all 4 "pages".
-  So the adopt job stops with an Error log when bol repeats the cursor it was just given (following
-  it would loop forever, and stopping without an error could hide offers). Operators are de-duplicated
-  by `id`. On the demo, adopting therefore ends after page 2 with that error.
+  (It is the spec's `Cursor` example, trailing comma included.) When bol repeats the cursor it was
+  just given:
+  - **Production**: the adopt job stops with an Error log. Following the cursor would loop forever,
+    and stopping without an error could hide offers.
+  - **Demo**: the repeat is treated as the last page, so adopting finishes normally there.
+  Offers are de-duplicated by `offerId` within a run: one seen again is skipped and only counted in
+  the report's `repeated`, so the outcome counts stay correct. Operators are de-duplicated by `id`.
