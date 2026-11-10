@@ -1,0 +1,57 @@
+{
+	"processStatuses": [
+		{
+			"processStatusId": "019bbcbc-1a21-77c9-9de6-0726d1379c91fff",
+			"entityId": "555551",
+			"eventType": "CREATE_SHIPMENT",
+			"description": "This is a mocked process status.",
+			"status": "PENDING",
+			"createTimestamp": "2026-10-28T15:54:38.0487173+01:00",
+			"links": [
+				{
+					"rel": "self",
+					"href": "https://api.bol.com/shared-demo/process-status/019bbcbc-1a21-77c9-9de6-0726d1379c91fff",
+					"method": "GET"
+				}
+			]
+		},
+		{
+			"processStatusId": "019bbcbd-5e95-73e9-ad92-c350f6454008bbb",
+			"entityId": "555552",
+			"eventType": "CANCEL_ORDER",
+			"description": "This is a mocked process status.",
+			"status": "SUCCESS",
+			"createTimestamp": "2026-10-28T15:54:38.048737989+01:00"
+		},
+		{
+			"processStatusId": "foobar12345",
+			"entityId": "555553",
+			"eventType": "CREATE_INBOUND",
+			"description": "This is a mocked process status.",
+			"status": "TIMEOUT",
+			"createTimestamp": "2026-10-28T15:54:38.048754975+01:00",
+			"links": [
+				{
+					"rel": "self",
+					"href": "https://api.bol.com/shared-demo/process-status/foobar12345",
+					"method": "GET"
+				}
+			]
+		},
+		{
+			"processStatusId": "987654xyz",
+			"entityId": "555554",
+			"eventType": "CHANGE_TRANSPORT",
+			"description": "This is a mocked process status.",
+			"status": "FAILURE",
+			"createTimestamp": "2026-10-28T15:54:38.048759622+01:00",
+			"links": [
+				{
+					"rel": "self",
+					"href": "https://api.bol.com/shared-demo/process-status/987654xyz",
+					"method": "GET"
+				}
+			]
+		}
+	]
+}

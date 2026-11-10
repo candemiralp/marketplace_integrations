@@ -165,3 +165,45 @@ failure inside the client would also defeat `log_once` (rule 6).
   Re-check after upgrading `ecommerce_integrations`.
 - Test site: `test_bol_settings.py` sets `test_ignore = ["Company"]`. Without it, the runner builds
   ERPNext Company test records, which need ERPNext's full test setup (`Warehouse Type: Transit`).
+
+---
+
+## ADR-006 — Process-status tracker (story 03)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/process-status-v10.yaml` (Shared API
+10.0.1) and the functional and demo pages for process status.
+
+| Story says | Spec / docs say | Decision |
+|---|---|---|
+| `GET /retailer/process-status/{id}` | **`/shared/process-status/{process-status-id}`** (also ADR-004) | Use the spec path. |
+| Bulk `POST /retailer/process-status` "if the spec confirms it" | `POST /shared/process-status`, body `{"processStatusQueries": [{"processStatusId": "…"}]}` (1–1000), response `{"processStatuses": [ProcessStatus…]}` | Every poll uses the bulk call (100 rows per run). |
+| Response fields | Confirmed: `processStatusId` (string, nullable), `entityId`, `eventType`, `description`, `status` ∈ `PENDING, SUCCESS, FAILURE, TIMEOUT`, `errorMessage`, `createTimestamp`, `links` | Rows are matched by `processStatusId`, stored as a string. |
+| — | Statuses are kept **for at most 1 day**. Afterwards the single GET returns 404 and the bulk call leaves the id out | An id missing from the bulk response counts as "no news": the row backs off, and the 24h timeout ends it. |
+
+**Decisions.**
+- **`BolClient.request(..., safe=True)`** for a POST that only reads. Its read timeouts and 502/504s
+  aren't ambiguous (they are retried), and its successes are logged like a GET (only with Debug
+  Logging). Without it the bulk poll would write a Success log every minute.
+- **Extra field `bol_status`** keeps bol's final status. `status` becomes `HANDLER_ERROR` when a
+  handler raises, and Retry handler needs to know whether to call `on_success` or `on_failure`.
+- **The cron hook calls `poll_pending` directly; there's no wrapper with
+  `enqueue(job_id="bol_poll_process_status", deduplicate=True)`.** Frappe v15's scheduler already
+  enqueues every scheduled job with `job_id="scheduled_job::<method>"` and skips it while that job is
+  queued or running (`ScheduledJobType.enqueue`), so runs can't overlap. A wrapper would only add a
+  second job every minute.
+- **Name = `processStatusId`** (`autoname: field:process_status_id`, also `unique`). Duplicate
+  `track()` returns the existing row; a concurrent `DuplicateEntryError` counts as already tracked.
+- **`HANDLER_MODULES`** in `process_status.py` lists the modules that call `register()`. A
+  background poll only imports `process_status`, so these modules are imported before any handler
+  lookup. It's a tuple in code, never read from the database. Each story that adds a handler adds its module.
+- Failure visibility: a FAILURE/TIMEOUT is logged and commented on the reference document *before*
+  `on_failure` runs. A handler exception is logged, commented on the reference document and on the
+  Bol Process, and rolled back to a savepoint just before the handler.
+- `retry_handler` checks roles with `frappe.get_roles()` instead of `frappe.only_for`, because
+  `only_for` lets everyone through when `frappe.flags.in_test` is set, so the check couldn't be tested.
+- Housekeeping (daily) deletes SUCCESS/FAILURE/TIMEOUT rows not modified for 90 days, and their
+  Comments. It keeps `HANDLER_ERROR` rows because someone still has to act on them.
+- There's no separate feature toggle: the tracker only does work for other features, and its jobs return
+  early while `Bol Settings.enabled` is off.
+- Comment helper `log.add_comment(reference, text)` for all stories. It does nothing if the document
+  no longer exists.

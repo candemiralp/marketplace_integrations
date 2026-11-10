@@ -49,14 +49,18 @@ class BolClient:
 		params=None,
 		accept: str | None = None,
 		reference: tuple[str, str] | None = None,
+		safe: bool = False,
 	) -> dict | bytes | None:
 		"""Call bol and return parsed JSON, bytes (non-JSON `accept`) or None (empty response).
 
 		`path` is the path as written in bol's spec (`/retailer/orders`, `/shared/process-status/1`).
+		`safe=True` marks a POST that only reads (bulk queries): it's retried and logged like a GET.
 		Successful calls are logged here; failures raise a BolError and the caller logs them
 		(`log_call(**err.details, error=err)` or `log_once`) once it has rolled back its own work.
 		"""
 		method = method.upper()
+		# Only a write sent as POST can be duplicated by a retry.
+		may_duplicate = method == "POST" and not safe
 		url = self._url(path)
 		headers = _headers(version, accept, has_body=json is not None)
 		retries = 0
@@ -65,13 +69,13 @@ class BolClient:
 		while True:
 			response = None
 			try:
-				response = self._send(method, url, headers, json, params)
+				response = self._send(method, url, headers, json, params, may_duplicate)
 				if response.status_code == 401 and not refreshed:
 					# The cached token may have been revoked or expired early: refresh once.
 					refreshed = True
 					invalidate_token(self.settings)
 					continue
-				result = _parse(method, response, accept)
+				result = _parse(response, accept, may_duplicate)
 			except BolError as e:
 				delay = _retry_delay(e, retries)
 				if delay is None:
@@ -84,7 +88,9 @@ class BolClient:
 				continue
 
 			log_call(
-				**_log_data(method, path, url, params, json, headers, response, accept), reference=reference
+				**_log_data(method, path, url, params, json, headers, response, accept),
+				reference=reference,
+				safe=safe,
 			)
 			return result
 
@@ -96,7 +102,7 @@ class BolClient:
 			path = f"{root}-demo/{rest}"
 		return f"{API_HOST}/{path}"
 
-	def _send(self, method, url, headers, json, params) -> requests.Response:
+	def _send(self, method, url, headers, json, params, may_duplicate) -> requests.Response:
 		token = get_token(self.settings, self.session)
 		try:
 			return self.session.request(
@@ -111,7 +117,7 @@ class BolClient:
 			# A POST that may have reached bol must not be retried blindly (it could duplicate).
 			raise BolTransientError(
 				f"bol request failed: {type(e).__name__}",
-				ambiguous=method == "POST" and not _never_sent(e),
+				ambiguous=may_duplicate and not _never_sent(e),
 			)
 
 
@@ -135,9 +141,8 @@ def _never_sent(error: requests.RequestException) -> bool:
 	return isinstance(reason, NewConnectionError)
 
 
-def _parse(method: str, response: requests.Response, accept: str | None):
+def _parse(response: requests.Response, accept: str | None, may_duplicate: bool):
 	status = response.status_code
-	is_post = method == "POST"
 
 	if 200 <= status < 300:
 		if status == 204 or not response.content:
@@ -147,7 +152,7 @@ def _parse(method: str, response: requests.Response, accept: str | None):
 		try:
 			return response.json()
 		except ValueError:
-			raise BolServerError("Unparseable response", ambiguous=is_post)
+			raise BolServerError("Unparseable response", ambiguous=may_duplicate)
 
 	problem = _problem(response)
 	detail = problem.get("detail")
@@ -161,9 +166,9 @@ def _parse(method: str, response: requests.Response, accept: str | None):
 		raise BolRateLimitError("bol rate limit reached", retry_after=retry_after_seconds(response))
 	if status in (502, 503, 504):
 		# 503 means bol didn't process the request; a 502/504 gateway may have forwarded it.
-		raise BolTransientError(f"bol unavailable (HTTP {status})", ambiguous=is_post and status != 503)
+		raise BolTransientError(f"bol unavailable (HTTP {status})", ambiguous=may_duplicate and status != 503)
 	if status >= 500:
-		raise BolServerError(f"bol server error (HTTP {status})", ambiguous=is_post)
+		raise BolServerError(f"bol server error (HTTP {status})", ambiguous=may_duplicate)
 	raise BolError(f"Unexpected bol response (HTTP {status})" + (f": {detail}" if detail else ""))
 
 

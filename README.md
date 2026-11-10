@@ -50,6 +50,20 @@ Only System Manager and Bol Manager can read the logs.
 **Tokens** are cached in Redis only, until 30 s before they expire. Saving Bol Settings clears the
 cached token.
 
+**Async operations (Bol Process).** bol handles shipments, cancellations, returns, labels and
+content uploads asynchronously. Each one is a **Bol Process** row (read-only), followed every minute
+until bol reports a final state:
+
+| Status | Meaning |
+|---|---|
+| `PENDING` | Waiting for bol. Checked again after 10 s, 30 s, 1 m, 2 m, 5 m, then every 10 m. |
+| `SUCCESS` | bol processed it; the follow-up (e.g. marking the delivery shipped) ran. |
+| `FAILURE` / `TIMEOUT` | bol rejected it or didn't finish within 24 h. *Error Message* says why. The related document gets a comment and the failure is in the integration log. Fix the cause and start the action again from that document. |
+| `HANDLER_ERROR` | bol is done, but our follow-up code failed. The related document and the Bol Process have a comment, and the traceback is in the integration log. After the bug is fixed, click **Retry handler** (System Manager / Bol Manager). |
+
+Polling only runs while *Enabled* is ticked in Bol Settings. Final rows are deleted after 90 days;
+`HANDLER_ERROR` rows are kept until someone retries them.
+
 **For developers** (details in `docs/decisions.md`, ADR-004/005):
 
 ```python
@@ -70,6 +84,21 @@ except BolError as err:
 - `err.ambiguous` is `True` when a POST may have been processed. Check bol's state before trying
   again.
 - Logs are written when the transaction commits or rolls back, never in the middle of it.
+
+Tracking an async bol call (ADR-006):
+
+```python
+from marketplace_integrations.bol import process_status
+
+# at import time in your feature module (and add the module to process_status.HANDLER_MODULES)
+process_status.register("shipment", on_shipment_confirmed, on_shipment_failed)
+
+response = client.request("POST", "/retailer/shipments", version=10, json=body)  # 202
+process_status.track(response, "shipment", delivery_note, payload={"order_item_ids": ids})
+```
+
+`on_success(doc, entity_id, payload)` and `on_failure(doc, message, payload)` must be idempotent: they
+run again on **Retry handler**. They run inside a savepoint; if they raise, their work is rolled back.
 
 ### Development
 

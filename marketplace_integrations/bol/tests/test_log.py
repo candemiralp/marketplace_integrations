@@ -2,6 +2,7 @@ import base64
 from unittest.mock import patch
 
 import frappe
+from frappe.model.document import Document
 from frappe.tests.utils import FrappeTestCase
 
 from marketplace_integrations.bol import log
@@ -48,6 +49,9 @@ class TestLogCall(FrappeTestCase):
 			({"method": "GET", "error": None}, 1, True),
 			({"method": "POST", "error": None}, 0, True),
 			({"method": "GET", "error": BolError("boom")}, 0, True),
+			({"method": "POST", "safe": True, "error": None}, 0, False),
+			({"method": "POST", "safe": True, "error": None}, 1, True),
+			({"method": "POST", "safe": True, "error": BolError("boom")}, 0, True),
 		]
 		for kwargs, debug, expected in cases:
 			with (
@@ -121,6 +125,25 @@ class TestLogCall(FrappeTestCase):
 		log_call.assert_called_once()
 		ttl = frappe.cache.ttl(frappe.cache.make_key(marker))
 		self.assertTrue(6 * 3600 - 10 <= ttl <= 6 * 3600, ttl)
+
+
+class TestAddComment(FrappeTestCase):
+	def test_comments_on_the_reference_document(self):
+		todo = frappe.get_doc({"doctype": "ToDo", "description": "comment target"}).insert()
+
+		log.add_comment(("ToDo", todo.name), "bol shipment failed: boom")
+
+		comments = frappe.get_all(
+			"Comment", filters={"reference_doctype": "ToDo", "reference_name": todo.name}, pluck="content"
+		)
+		self.assertEqual(comments, ["bol shipment failed: boom"])
+
+	def test_skips_a_missing_or_empty_reference(self):
+		with patch.object(Document, "add_comment") as add_comment:
+			log.add_comment(("ToDo", "does-not-exist"), "x")
+			log.add_comment(None, "x")
+			log.add_comment((None, None), "x")
+		add_comment.assert_not_called()
 
 
 class TestNoSecretsInLogs(FrappeTestCase):

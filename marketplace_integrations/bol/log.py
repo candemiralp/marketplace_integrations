@@ -36,9 +36,13 @@ def log_call(
 	response=None,
 	error=None,
 	reference: tuple[str, str] | None = None,
+	safe: bool = False,
 ):
-	"""Log a bol call. Failures are always logged; successes only for writes or with debug logging."""
-	if error is None and not _log_success(method):
+	"""Log a bol call. Failures are always logged; successes only for writes or with debug logging.
+
+	`safe` marks a call that changed nothing at bol even though it isn't a GET (a POST query).
+	"""
+	if error is None and not _log_success(method, safe):
 		return
 
 	reference_doctype, reference_name = reference or (None, None)
@@ -68,8 +72,16 @@ def log_once(kind: str, key: str, **kwargs) -> bool:
 	return True
 
 
-def _log_success(method) -> bool:
-	return method != "GET" or bool(frappe.db.get_single_value("Bol Settings", "debug_logging"))
+def add_comment(reference: tuple[str, str] | None, text: str):
+	"""Show a failure on the related document's timeline (in the caller's transaction)."""
+	doctype, name = reference or (None, None)
+	if not (doctype and name and frappe.db.exists(doctype, name)):
+		return
+	frappe.get_doc(doctype, name).add_comment("Comment", text)
+
+
+def _log_success(method, safe) -> bool:
+	return (method != "GET" and not safe) or bool(frappe.db.get_single_value("Bol Settings", "debug_logging"))
 
 
 def _dump(data):
