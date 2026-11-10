@@ -1,7 +1,7 @@
 [project]
 name = "marketplace_integrations"
 authors = [
-    { name = "Can Demiralp", email = "github@candemiralp.com"}
+    { name = "Magnatlas", email = "github@candemiralp.com"}
 ]
 description = "Integrates with marketplaces"
 requires-python = ">=3.10"
@@ -28,15 +28,7 @@ line-length = 110
 target-version = "py310"
 
 [tool.ruff.lint]
-select = [
-    "F",
-    "E",
-    "W",
-    "I",
-    "UP",
-    "B",
-    "RUF",
-]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = [
     "B017", # assertRaises(Exception) - should be more specific
     "B018", # useless expression, not assigned to anything
@@ -50,7 +42,6 @@ ignore = [
     "F403", # can't detect undefined names from * import
     "F405", # can't detect undefined names from * import
     "F722", # syntax error in forward type annotation
-    "W191", # indentation contains tabs
 ]
 typing-modules = ["frappe.types.DF"]
 
