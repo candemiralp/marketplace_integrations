@@ -415,3 +415,62 @@ ERPNext 15.124.5 and the demo environment.
   3 units) imported as a submitted SO on `dev.localhost` with the BE template, the item's bol ids, the Brussels
   address (extension `B`) and a separate billing address. The demo's `totalPrice` doesn't match its unit price and
   discount, so that SO got the rounding comment, plus a reference comment (the demo's reference `MijnOffer1121`).
+
+---
+
+## ADR-011 — Shipment confirmation (story 08)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/retailer-api-v10.json` (Retailer API v10, Shipments and
+Transports), bol's functional page *Orders and Shipments* (v10), ERPNext 15.124.5 and the demo environment.
+
+| Story says | Spec / docs / demo say | Decision |
+|---|---|---|
+| `POST /retailer/shipments {orderItems[{orderItemId, quantity}], shipmentReference, shippingLabelId?, transport?}` → 202 | Confirmed (`ShipmentRequest`): 1–100 order items, `quantity` > 0 (omitted = all open units), `shipmentReference` ≤ 90 chars, null or non-empty; `transport.transporterCode` required, `trackAndTrace` nullable | Quantities are summed per order item and always sent. `shipmentReference` = the Delivery Note name. An empty T&T is sent as `null`. |
+| `transporterCode` enum ("check the enum") | **The spec has no enum** (a plain string). The functional page lists the codes; dashes and underscores are mixed (`TNT-EXTRA`, `TNT_BRIEF`, `DPD-NL`, `BPOST_BE`) and "could change between versions" | 13 codes in `mappers/shipment.TRANSPORTER_CODES`: TNT (PostNL), TNT-EXTRA, TNT_BRIEF, BRIEFPOST, DHL, DHLFORYOU, DPD-NL, DPD-BE, BPOST_BE, BPOST_BRIEF, GLS, UPS, OTHER. Delivery Note *bol Transporter* and Bol Settings *Default Transporter* use the same list (a test keeps them equal). |
+| `entityId` = shipmentId | The spec's generic `ProcessStatus.entityId` text says "the id of the order item". The functional page: "corresponds to the shipment id … returned only if the status is SUCCESS" | The functional page is followed. Should `entityId` be missing on SUCCESS, the handler looks the shipment up (reconcile). |
+| `GET /retailer/shipments?order-id=` | `ReducedShipment {shipmentId, shipmentReference, order, shipmentItems[{orderItemId, ean}], transport{transportId}}`: **no quantities**. `GET /retailer/shipments/{id}` has `shipmentItems[].quantity/quantityShipped` and `transport{transportId, transporterCode, trackAndTrace}` | Reconcile: a listed shipment with our reference is ours. Otherwise a shipment with exactly our order items (not recorded on another DN) is fetched and is ours when its reference is ours, or its quantities equal ours and its reference names no other DN. Only page 1 is read: one order's shipments fit on it. |
+| `PUT /retailer/transports/{id}` "adds or corrects T&T later" | `ChangeTransportRequest {trackAndTrace (required), transporterCode?}` → 202. The functional page: it "only allows you to add the tracking information when the trackAndTrace code is missing", and advises against changing the code or the transporter with it | **Add only.** `update_transport` reads the shipment; it PUTs when bol has no T&T, does nothing when bol has the same one, and comments ("correct it in the seller dashboard") when bol has another. |
+| — | Spec error responses: 400 only (plus 404 on the detail) | 400 → `BolValidationError` with violations → Failed (§ below). |
+
+**Demo environment (checked live, `dev.localhost`).** `POST /retailer-demo/shipments` answers any body with a canned
+`CREATE_SHIPMENT` ProcessStatus (id `019bbcbc-…fff`, no `entityId`); the bulk process-status call then answers `PENDING`
+with `entityId 555551` forever, so on Demo a shipment stays *Pending*. `PUT /retailer-demo/transports/312778947` answers a
+`CHANGE_TRANSPORT` ProcessStatus. The unfiltered list returns 4 canned shipments **without `shipmentReference`**; with
+`order-id` the demo only knows `7616222250` (its list entry does carry the reference) and answers a 400 *"Requested demo
+environment resource is not available"* for any other order. In Demo that 400 counts as "no shipments" (as with the order
+pages, ADR-010). Details exist only for the canned ids. A Delivery Note couldn't be submitted on `dev.localhost`: its
+company has no default inventory account (perpetual inventory), unrelated to this app. The flows are covered by tests
+against an in-memory fake of the endpoints.
+
+**Decisions.**
+- **Statuses** (`bol_shipment_status`, all written with `db_set`, never by saving the DN): *Pending* (submitted; sent or
+  about to be), *Confirmed*, *Failed* (a person has to act), *Unknown* (bol may have it).
+- **Reconcile before every POST**, not only after an ambiguous one. It costs one GET per shipment and covers every way a
+  shipment can exist without our knowing: an ambiguous POST, a crash between the POST and `track()`, a job run twice,
+  a shipment made in the seller dashboard. bol itself also refuses to ship more than the open quantity, a second guard.
+- **Failures in `confirm_shipment`** (inside a savepoint):
+  - 400/422 → *Failed*, comment with bol's violations, log.
+  - Auth error, our data (`BolMappingError`), any other non-transient bol error → *Failed*, comment, log.
+  - `ambiguous=True`, a 202 without `processStatusId`, or any error after the POST → *Unknown*, logged and commented
+    once per 6 h (`bol:failed:shipment_unknown:{dn}`).
+  - Transient, rate limit, 5xx after the client's retries → stays *Pending*, logged and commented once per 6 h
+    (`bol:failed:shipment:{dn}`).
+  - Anything else (a bug) → *Failed*, log, comment, commit, re-raise (the job fails).
+- **Sweep** (owner's decision): every 10 minutes `sweep_shipments` queues `confirm_shipment` for Delivery Notes *Unknown*
+  or *Pending*, not modified for 10 minutes, without an unfinished Bol Process (PENDING or HANDLER_ERROR), 50 per run.
+  That recovers lost jobs, bol outages and ambiguous timeouts without a click. *Failed* waits for **Retry bol shipment**.
+- **Handlers.** `shipment.on_failure` only sets *Failed*: process_status has already logged bol's `errorMessage` and
+  commented it on the DN (ADR-006). `shipment.on_success` also queues `update_transport` when the T&T was filled in while
+  the shipment was *Pending*. `transport` comments on success; a failure is commented by the tracker.
+- **Cancellation** is blocked for *Pending* and *Confirmed* (story) **and *Unknown*** (bol may have it; Retry settles it).
+  *Failed* can be cancelled.
+- **Validation runs only while *Push Shipments* is on**, except that `bol_order_id` is always filled from the Sales Order
+  (informational). Return Delivery Notes are left alone (story 11). Without a distribution party a line counts as
+  RETAILER. BOL lines need no transporter or T&T here; story 09 adds the label check.
+- **Retry** needs System Manager/Bol Manager (`check_bol_role`, ADR-006) **and** Delivery Note write permission; only
+  *Failed*/*Unknown*. An unexpected error becomes a `ValidationError` message.
+- **Settings defaults on existing sites.** A Single's field defaults apply only while the Single has no stored values
+  at all, so on a site whose Bol Settings were saved before, *Require Track & Trace* would read 0. Patch
+  `set_shipment_defaults` stores the defaults of the two new fields when they have no value. (`stock_buffer`, story 06,
+  has the same gap on such sites.)
+- `tests/utils.make_bol_manager` (moved from `test_catalog.py`) gives a user with only the Bol Manager role.

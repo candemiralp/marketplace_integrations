@@ -8,9 +8,11 @@ from frappe.tests.utils import FrappeTestCase
 from marketplace_integrations.bol import catalog
 from marketplace_integrations.bol.api.errors import BolNotFoundError, BolTransientError
 from marketplace_integrations.bol.tests.utils import (
+	BOL_MANAGER,
 	OPERATOR_ID,
 	TEST_BRAND,
 	discard_pending_logs,
+	make_bol_manager,
 	make_brand,
 	make_catalog_masters,
 	make_item,
@@ -20,7 +22,6 @@ FIXTURES = Path(__file__).parent / "fixtures"
 OPERATORS = json.loads((FIXTURES / "economic_operators.json").read_text())
 EAN = "4006381333931"
 OTHER_EAN = "8712345678906"
-BOL_MANAGER = "bol.manager.test@example.com"
 
 
 class CatalogTestCase(FrappeTestCase):
@@ -224,7 +225,7 @@ class TestSetBrandEconomicOperator(EconomicOperatorTestCase):
 		self.client.request.assert_not_called()
 
 	def test_bol_manager_without_brand_write_permission(self):
-		_make_bol_manager()
+		make_bol_manager()
 		frappe.set_user(BOL_MANAGER)
 		self.client.request.return_value = OPERATORS["operators"][0]
 
@@ -242,13 +243,3 @@ class TestSetBrandEconomicOperator(EconomicOperatorTestCase):
 		with self.assertRaises(frappe.PermissionError):
 			catalog.set_brand_economic_operator(self.brand.name, OPERATOR_ID)
 		self.client.request.assert_not_called()
-
-
-def _make_bol_manager():
-	if frappe.db.exists("User", BOL_MANAGER):
-		return
-	user = frappe.get_doc(
-		{"doctype": "User", "email": BOL_MANAGER, "first_name": "bol", "send_welcome_email": 0}
-	)
-	user.append("roles", {"role": "Bol Manager"})
-	user.insert()

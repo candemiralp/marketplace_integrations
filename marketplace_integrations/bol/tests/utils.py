@@ -64,6 +64,20 @@ class FakeSession:
 		return result
 
 
+BOL_MANAGER = "bol.manager.test@example.com"
+
+
+def make_bol_manager():
+	"""A user whose only role is Bol Manager (no permission on ERPNext documents)."""
+	if frappe.db.exists("User", BOL_MANAGER):
+		return
+	user = frappe.get_doc(
+		{"doctype": "User", "email": BOL_MANAGER, "first_name": "bol", "send_welcome_email": 0}
+	)
+	user.append("roles", {"role": "Bol Manager"})
+	user.insert()
+
+
 def discard_pending_logs():
 	"""Drop the logs bol/log.py queued in this test's transaction (they would be flushed on rollback)."""
 	frappe.local.bol_pending_logs = None
