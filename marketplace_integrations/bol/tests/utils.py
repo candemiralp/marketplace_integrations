@@ -148,3 +148,83 @@ def make_warehouse(name: str = TEST_WAREHOUSE, is_group: int = 0) -> str:
 			{"doctype": "Warehouse", "name": name, "warehouse_name": name, "is_group": is_group}
 		).db_insert()
 	return name
+
+
+# Order import masters: a Company with its chart of accounts, a Customer and VAT-inclusive templates.
+TEST_COMPANY = "_Test bol Company"
+TEST_COMPANY_ABBR = "TBOL"
+TEST_CUSTOMER = "_Test bol Customer"
+TAX_TEMPLATE_TITLES = {"NL": "_Test bol VAT NL incl", "BE": "_Test bol VAT BE incl"}
+
+
+def make_order_masters() -> frappe._dict:
+	"""The masters a Sales Order needs, created once and committed: building a Company takes seconds.
+
+	The test site has no Company (no setup wizard); ERPNext's own Company test records need its full test setup.
+	"""
+	if not frappe.db.exists("Company", TEST_COMPANY):
+		_make_company()
+		frappe.db.commit()  # nosemgrep
+	if not frappe.db.exists("Address Template", {"is_default": 1}):
+		# Rendering an Address needs one; the setup wizard normally creates it.
+		frappe.get_doc({"doctype": "Address Template", "country": "Netherlands", "is_default": 1}).insert()
+		frappe.db.commit()  # nosemgrep
+	return frappe._dict(
+		company=TEST_COMPANY,
+		customer=TEST_CUSTOMER,
+		warehouse=f"Stores - {TEST_COMPANY_ABBR}",
+		tax_template_nl=f"{TAX_TEMPLATE_TITLES['NL']} - {TEST_COMPANY_ABBR}",
+		tax_template_be=f"{TAX_TEMPLATE_TITLES['BE']} - {TEST_COMPANY_ABBR}",
+	)
+
+
+def _make_company():
+	if not frappe.db.exists("Warehouse Type", "Transit"):
+		# Company.create_default_warehouses adds a "Goods In Transit" warehouse of this type.
+		frappe.get_doc({"doctype": "Warehouse Type", "name": "Transit"}).insert()
+	frappe.get_doc(
+		{
+			"doctype": "Company",
+			"company_name": TEST_COMPANY,
+			"abbr": TEST_COMPANY_ABBR,
+			"default_currency": "EUR",
+			"country": "Netherlands",
+			"create_chart_of_accounts_based_on": "Standard Template",
+			"chart_of_accounts": "Standard",
+		}
+	).insert()
+	parent = frappe.db.get_value("Account", {"company": TEST_COMPANY, "account_type": "Tax", "is_group": 1})
+	for country, title in TAX_TEMPLATE_TITLES.items():
+		account = frappe.get_doc(
+			{
+				"doctype": "Account",
+				"account_name": f"_Test bol VAT {country}",
+				"company": TEST_COMPANY,
+				"parent_account": parent,
+				"account_type": "Tax",
+				"tax_rate": 21,
+			}
+		).insert()
+		make_tax_template(title, account.name)
+	frappe.get_doc(
+		{"doctype": "Customer", "customer_name": TEST_CUSTOMER, "customer_type": "Company"}
+	).insert()
+
+
+def make_tax_template(title: str, account: str, included: int = 1, company: str = TEST_COMPANY):
+	return frappe.get_doc(
+		{
+			"doctype": "Sales Taxes and Charges Template",
+			"title": title,
+			"company": company,
+			"taxes": [
+				{
+					"charge_type": "On Net Total",
+					"account_head": account,
+					"description": title,
+					"rate": 21,
+					"included_in_print_rate": included,
+				}
+			],
+		}
+	).insert()

@@ -134,7 +134,7 @@ def _adopt(offer: dict, report: dict):
 
 
 def _map_offer(offer_id: str, ean: str | None, status: str) -> tuple[str, dict]:
-	items = _items_by_ean(ean) if ean else []
+	items = items_by_ean(ean) if ean else []
 	if not items:
 		return "unmatched", {}
 	if len(items) > 1:
@@ -164,7 +164,7 @@ def _map_offer(offer_id: str, ean: str | None, status: str) -> tuple[str, dict]:
 	return outcome, {}
 
 
-def _items_by_ean(ean: str) -> list[str]:
+def items_by_ean(ean: str) -> list[str]:
 	# Item Barcode.barcode is unique, but the same GTIN can be stored as UPC-A, EAN-13 or GTIN-14.
 	parents = frappe.get_all(
 		"Item Barcode", filters={"parenttype": "Item", "barcode": ("in", gtin_forms(ean))}, pluck="parent"

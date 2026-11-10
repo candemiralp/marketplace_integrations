@@ -5,6 +5,9 @@ frappe.ui.form.on("Bol Settings", {
 	setup(frm) {
 		frm.set_query("price_list", () => ({ filters: { selling: 1 } }));
 		frm.set_query("warehouse", () => ({ filters: { is_group: 0, company: frm.doc.company } }));
+		for (const field of ["tax_template_nl", "tax_template_be"]) {
+			frm.set_query(field, () => ({ filters: { company: frm.doc.company } }));
+		}
 	},
 
 	refresh(frm) {
