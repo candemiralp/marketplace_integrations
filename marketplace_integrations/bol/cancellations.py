@@ -109,7 +109,9 @@ def sync_order(so_name: str, order: dict):
 	rows = _bol_rows(so_name)
 	cancelled, requested = changes(order, rows)
 	if requested:
-		_safely(REQUEST_SAVEPOINT, "cancellation_request", so_name, _record_requests, so_name, requested, rows)
+		_safely(
+			REQUEST_SAVEPOINT, "cancellation_request", so_name, _record_requests, so_name, requested, rows
+		)
 	if cancelled:
 		_safely(APPLY_SAVEPOINT, "cancellation", so_name, apply_cancelled_qty, so_name, cancelled)
 
@@ -189,7 +191,9 @@ def apply_cancelled_qty(so_name: str, cancelled: dict[str, float]):
 		_update_draft(so, remaining)
 	for row, new_cancelled, _delta in applied:
 		if remaining[row.name]:
-			frappe.db.set_value(ITEM_DOCTYPE, row.name, "bol_qty_cancelled", new_cancelled, update_modified=False)
+			frappe.db.set_value(
+				ITEM_DOCTYPE, row.name, "bol_qty_cancelled", new_cancelled, update_modified=False
+			)
 	so.add_comment("Comment", _("bol cancelled {0}. The Sales Order was adjusted.").format(lines))
 
 
@@ -211,7 +215,9 @@ def _cancel_whole(so, applied: list[tuple], lines: str):
 	so.flags.bol_cancelled = True
 	so.flags.ignore_permissions = True
 	so.cancel()
-	so.add_comment("Comment", _("bol cancelled the whole order ({0}). The Sales Order was cancelled.").format(lines))
+	so.add_comment(
+		"Comment", _("bol cancelled the whole order ({0}). The Sales Order was cancelled.").format(lines)
+	)
 
 
 def _update_items(so, remaining: dict[str, float]):
@@ -356,9 +362,9 @@ def _cancellable_rows(so, so_details: list[str]) -> list:
 			)
 		if flt(row.delivered_qty):
 			frappe.throw(
-				_("Row {0}: {1} is delivered already, so bol can't cancel it. Process a return instead.").format(
-					row.idx, row.item_code
-				),
+				_(
+					"Row {0}: {1} is delivered already, so bol can't cancel it. Process a return instead."
+				).format(row.idx, row.item_code),
 				title=_("Not Allowed"),
 			)
 		if row.name in pending:
@@ -437,7 +443,11 @@ def _safely(savepoint: str, kind: str, so_name: str, fn, *args):
 	except Exception as e:
 		# update_child_qty_rate refused, a locked row, …: nothing half-done stays, and the next poll retries.
 		frappe.db.rollback(save_point=savepoint)
-		details = getattr(e, "details", None) or {"method": fn.__name__, "path": PATH, "request": list(args[1:])}
+		details = getattr(e, "details", None) or {
+			"method": fn.__name__,
+			"path": PATH,
+			"request": list(args[1:]),
+		}
 		if log_once(kind, so_name, **details, error=e, reference=(DOCTYPE, so_name)):
 			add_comment(
 				(DOCTYPE, so_name),
@@ -451,7 +461,14 @@ def _bol_rows(so_name: str) -> dict[str, dict]:
 	rows = frappe.get_all(
 		ITEM_DOCTYPE,
 		filters={"parent": so_name, "parenttype": DOCTYPE, "bol_order_item_id": ("is", "set")},
-		fields=["name", "bol_order_item_id", "bol_qty_cancelled", "bol_cancellation_requested", "item_code", "qty"],
+		fields=[
+			"name",
+			"bol_order_item_id",
+			"bol_qty_cancelled",
+			"bol_cancellation_requested",
+			"item_code",
+			"qty",
+		],
 	)
 	return {row.bol_order_item_id: row for row in rows}
 

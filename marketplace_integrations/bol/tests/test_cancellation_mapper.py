@@ -83,7 +83,9 @@ class TestFields(unittest.TestCase):
 	def test_missing_or_empty_items_have_not(self):
 		self.assertFalse(has_cancellation_fields({"orderId": "A1", "orderItems": []}))
 		self.assertFalse(has_cancellation_fields({"orderId": "A1"}))
-		self.assertFalse(has_cancellation_fields({"orderItems": [{"orderItemId": SHIRT_ITEM, "quantity": 1}]}))
+		self.assertFalse(
+			has_cancellation_fields({"orderItems": [{"orderItemId": SHIRT_ITEM, "quantity": 1}]})
+		)
 
 
 class TestBody(unittest.TestCase):
