@@ -1,0 +1,87 @@
+{
+  "orderId": "A2K8290LP8",
+  "pickupPoint": false,
+  "orderPlacedDateTime": "2026-11-09T23:30:00+01:00",
+  "shipmentDetails": {
+    "pickupPointName": null,
+    "salutation": "FEMALE",
+    "firstName": "Billie",
+    "surname": "Jansen",
+    "streetName": "Dorpstraat",
+    "houseNumber": "1",
+    "houseNumberExtension": "B",
+    "extraAddressInformation": "Apartment",
+    "zipCode": "1111ZZ",
+    "city": "Utrecht",
+    "countryCode": "NL",
+    "email": "billie@verkopen.bol.com",
+    "company": null,
+    "deliveryPhoneNumber": "012123456",
+    "language": "nl"
+  },
+  "billingDetails": {
+    "salutation": "FEMALE",
+    "firstName": "Billie",
+    "surname": "Jansen",
+    "streetName": "Dorpstraat",
+    "houseNumber": "1",
+    "houseNumberExtension": "B",
+    "extraAddressInformation": "Apartment",
+    "zipCode": "1111ZZ",
+    "city": "Utrecht",
+    "countryCode": "NL",
+    "email": "billie@verkopen.bol.com",
+    "company": null,
+    "vatNumber": null,
+    "kvkNumber": null,
+    "orderReference": "MijnReferentie"
+  },
+  "orderItems": [
+    {
+      "orderItemId": "2012345678",
+      "cancellationRequest": false,
+      "fulfilment": {
+        "method": "FBR",
+        "distributionParty": "RETAILER",
+        "latestDeliveryDate": "2026-11-12",
+        "exactDeliveryDate": null,
+        "expiryDate": "2026-11-15",
+        "timeFrameType": "REGULAR"
+      },
+      "offer": {"offerId": "6ff736b5-cdd0-4150-8c67-78269ee986f5", "reference": "_Test bol order shirt"},
+      "product": {"ean": "4006381333931", "title": "Embroidered shirt"},
+      "quantity": 2,
+      "quantityShipped": 0,
+      "quantityCancelled": 0,
+      "unitPrice": 24.95,
+      "totalPrice": 49.9,
+      "discounts": [],
+      "commission": 5.18,
+      "additionalServices": [],
+      "latestChangedDateTime": "2026-11-09T23:30:00+01:00"
+    },
+    {
+      "orderItemId": "2012345679",
+      "cancellationRequest": false,
+      "fulfilment": {
+        "method": "FBR",
+        "distributionParty": "RETAILER",
+        "latestDeliveryDate": "2026-11-11",
+        "exactDeliveryDate": null,
+        "expiryDate": "2026-11-14",
+        "timeFrameType": "REGULAR"
+      },
+      "offer": {"offerId": "7ee736b5-cdd0-4150-8c67-78269ee986f6", "reference": "_Test bol order bag"},
+      "product": {"ean": "8712345678906", "title": "Embroidered bag"},
+      "quantity": 1,
+      "quantityShipped": 0,
+      "quantityCancelled": 0,
+      "unitPrice": 12.99,
+      "totalPrice": 12.99,
+      "discounts": [],
+      "commission": 1.95,
+      "additionalServices": [],
+      "latestChangedDateTime": "2026-11-09T23:30:00+01:00"
+    }
+  ]
+}

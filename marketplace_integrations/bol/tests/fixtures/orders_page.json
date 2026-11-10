@@ -1,0 +1,21 @@
+{
+  "orders": [
+    {
+      "orderId": "A2K8290LP8",
+      "orderPlacedDateTime": "2026-11-09T23:30:00+01:00",
+      "orderItems": [
+        {
+          "orderItemId": "2012345678",
+          "ean": "4006381333931",
+          "fulfilmentMethod": "FBR",
+          "fulfilmentStatus": "OPEN",
+          "quantity": 2,
+          "quantityShipped": 0,
+          "quantityCancelled": 0,
+          "cancellationRequest": false,
+          "latestChangedDateTime": "2026-11-09T23:30:00+01:00"
+        }
+      ]
+    }
+  ]
+}

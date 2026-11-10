@@ -103,4 +103,71 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"no_copy": 1,
 		},
 	],
+	# Imported bol orders (story 07). bol_order_id is the natural key of the import.
+	"Sales Order": [
+		{
+			"fieldname": "bol_order_id",
+			"fieldtype": "Data",
+			"label": "bol Order ID",
+			"insert_after": "po_date",
+			"unique": 1,
+			"no_copy": 1,
+			"read_only": 1,
+			"in_standard_filter": 1,
+		},
+	],
+	# Per line: what shipments (08) and cancellations (10) refer to at bol.
+	"Sales Order Item": [
+		{
+			"fieldname": "bol_section",
+			"fieldtype": "Section Break",
+			"label": "bol.com",
+			"insert_after": "project",
+			"collapsible": 1,
+			"depends_on": "eval:doc.bol_order_item_id",
+		},
+		{
+			"fieldname": "bol_order_item_id",
+			"fieldtype": "Data",
+			"label": "bol Order Item ID",
+			"insert_after": "bol_section",
+			"no_copy": 1,
+			"read_only": 1,
+		},
+		{
+			"fieldname": "bol_distribution_party",
+			"fieldtype": "Select",
+			"label": "bol Distribution Party",
+			"options": "\nRETAILER\nBOL",
+			"insert_after": "bol_order_item_id",
+			"read_only": 1,
+		},
+		{"fieldname": "bol_column", "fieldtype": "Column Break", "insert_after": "bol_distribution_party"},
+		{
+			"fieldname": "bol_latest_delivery_date",
+			"fieldtype": "Date",
+			"label": "bol Latest Delivery Date",
+			"insert_after": "bol_column",
+			"read_only": 1,
+		},
+		{
+			"fieldname": "bol_commission",
+			"fieldtype": "Currency",
+			"label": "bol Commission",
+			"options": "currency",
+			"insert_after": "bol_latest_delivery_date",
+			"read_only": 1,
+		},
+	],
+	# Buyer addresses created by the order import: they hold buyer PII (cleaned up in story 15).
+	"Address": [
+		{
+			"fieldname": "bol_buyer",
+			"fieldtype": "Check",
+			"label": "bol Buyer",
+			"insert_after": "is_shipping_address",
+			"read_only": 1,
+			"no_copy": 1,
+		},
+	],
 }

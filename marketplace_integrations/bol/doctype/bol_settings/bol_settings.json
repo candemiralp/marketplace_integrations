@@ -22,7 +22,15 @@
   "sync_stock",
   "warehouse",
   "stock_column",
-  "stock_buffer"
+  "stock_buffer",
+  "orders_section",
+  "import_orders",
+  "customer",
+  "submit_orders",
+  "import_orders_placed_after",
+  "orders_column",
+  "tax_template_nl",
+  "tax_template_be"
  ],
  "fields": [
   {
@@ -118,11 +126,11 @@
    "label": "Sync Stock"
   },
   {
-   "description": "The warehouse bol orders ship from. Its actual qty minus open Sales Orders, stock reservations and the buffer is what bol may sell.",
+   "description": "The warehouse bol orders ship from: imported order lines use it. Its actual qty minus open Sales Orders, stock reservations and the buffer is what bol may sell.",
    "fieldname": "warehouse",
    "fieldtype": "Link",
    "label": "Warehouse",
-   "mandatory_depends_on": "eval:doc.sync_stock",
+   "mandatory_depends_on": "eval:doc.sync_stock || doc.import_orders",
    "options": "Warehouse"
   },
   {
@@ -136,13 +144,66 @@
    "fieldtype": "Int",
    "label": "Stock Buffer",
    "non_negative": 1
+  },
+  {
+   "fieldname": "orders_section",
+   "fieldtype": "Section Break",
+   "label": "Orders"
+  },
+  {
+   "default": "0",
+   "description": "Import every new FBR bol order as a Sales Order (checked every 5 minutes). Order lines use the Warehouse in the Stock section.",
+   "fieldname": "import_orders",
+   "fieldtype": "Check",
+   "label": "Import Orders"
+  },
+  {
+   "description": "The customer all bol orders are booked on (e.g. \"bol.com\"). Buyer addresses are linked to it.",
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "mandatory_depends_on": "eval:doc.import_orders",
+   "options": "Customer"
+  },
+  {
+   "default": "1",
+   "description": "Submit imported Sales Orders. Untick to review them as drafts first.",
+   "fieldname": "submit_orders",
+   "fieldtype": "Check",
+   "label": "Submit Orders"
+  },
+  {
+   "description": "Cutover guard: orders placed before this moment are never imported (they already came in through Shopify).",
+   "fieldname": "import_orders_placed_after",
+   "fieldtype": "Datetime",
+   "label": "Import Orders Placed After"
+  },
+  {
+   "fieldname": "orders_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "For buyers in the Netherlands. Every row must be included in the print rate: bol prices include VAT.",
+   "fieldname": "tax_template_nl",
+   "fieldtype": "Link",
+   "label": "Tax Template NL",
+   "mandatory_depends_on": "eval:doc.import_orders",
+   "options": "Sales Taxes and Charges Template"
+  },
+  {
+   "description": "For buyers in Belgium (OSS). Every row must be included in the print rate.",
+   "fieldname": "tax_template_be",
+   "fieldtype": "Link",
+   "label": "Tax Template BE",
+   "mandatory_depends_on": "eval:doc.import_orders",
+   "options": "Sales Taxes and Charges Template"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 21:00:00.000000",
+ "modified": "2026-11-10 23:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",

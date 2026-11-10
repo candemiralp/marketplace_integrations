@@ -362,3 +362,48 @@ response. On the demo a sync therefore ends in `Not synced` (create without `off
   If the list fails, an Error log carries the counts so far and the job fails.
 - **Demo environment.** The demo rejects offer PATCHes with HTTP 403 (ADR-008), so pushes are covered by tests
   against the in-memory fake of the offer endpoints. The poll was checked on the dev site with a real Stock Entry.
+
+---
+
+## ADR-010 — Order import (story 07)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/retailer-api-v10.json` (Retailer API v10, Orders),
+ERPNext 15.124.5 and the demo environment.
+
+| Story says | Spec / ERPNext / demo says | Decision |
+|---|---|---|
+| `GET /retailer/orders?fulfilment-method=FBR&status=OPEN&page=N`, 50 per page, stop on an empty page | Confirmed (`ReducedOrders {orders[{orderId, orderPlacedDateTime, orderItems[]}]}`); the spec states no page size. **The demo only has page 1**: page 2 is a 400 "Requested demo environment resource is not available" | Page until a page is empty; an id seen on an earlier page counts once (pages can shift). In Demo, stop after page 1. |
+| `GET /retailer/orders/{order-id}` fields | Confirmed. Also: `pickupPoint`, `shipmentDetails.pickupPointName`, `billingDetails.kvkNumber/orderReference`, line `totalPrice`, `discounts[{title, amount}]`, `additionalServices`, `fulfilment.exactDeliveryDate`. `orderPlacedDateTime` is nullable | See decisions below. A missing placed date counts as "now". |
+| `rate = unitPrice` | `unitPrice` is before bol's promotion; `totalPrice = unitPrice × quantity − Σ discounts` (VAT incl.), so the acceptance criterion "SO total = bol's total" fails with a promotion | **Owner decision: per-line discount.** `price_list_rate = unitPrice`, `discount_amount = Σ discounts / quantity` (cents, half-up), `rate = price_list_rate − discount_amount`. A per-unit rate stays right when stories 10/11 cancel or return part of a line. When `rate × open qty` ≠ bol's `totalPrice` pro rata (the discount doesn't split into whole cents), the SO gets a comment. |
+| `delivery_date` = minimum `latestDeliveryDate` | `latestDeliveryDate` is empty when the buyer chose an `exactDeliveryDate`. ERPNext's `validate_delivery_date` **overwrites the header with the latest line date**, and refuses a delivery date before the order date (the demo's orders have 2018 delivery dates on 2019 orders) | Per line `latestDeliveryDate or exactDeliveryDate` is stored in `bol_latest_delivery_date`. **Every line's `delivery_date` is the order's** (the earliest of them, never before the order date, else placed + 1), so the header keeps the minimum. |
+| Total equal to bol's | ERPNext rounds the grand total to whole euros unless `disable_rounded_total` | `disable_rounded_total = 1` on the SO; Sales Invoices made from it (story 12) copy it. ERPNext's inclusive-tax rounding can leave `net_total + total_taxes_and_charges` a cent off `grand_total` (it corrects the tax rows on invoices); `grand_total` is bol's. |
+| `DuplicateEntryError` on `bol_order_id` = already imported | Frappe v15 raises **`UniqueValidationError(doctype, name, db_error)`** for a unique non-PK column (`DuplicateEntryError` is only for the primary key). When the other import has already committed, **ERPNext's `validate_po`** ("one Sales Order per customer PO", `po_no = orderId`) fails first, with a plain `ValidationError` | After any failure the order is rolled back to its savepoint; it counts as already imported (no log) when the error is the `bol_order_id` unique key or the Sales Order now exists. |
+| Poll job `job_id="bol_poll_orders"` with dedupe | Frappe v15's scheduler enqueues with `scheduled_job::<method>` and skips a run while the previous one is queued or running (ADR-006) | The cron (`*/5 * * * *`) calls `orders.poll_orders` directly. |
+| — | Lines carry `fulfilment.method` | Non-FBR lines are skipped (FBB is out of scope). |
+| `billingDetails.vatNumber` | Address has no VAT field | Not stored; the billing address is created only when its address fields differ from shipping. |
+| — | `pickupPointName` | Put first in `address_line2` (before `extraAddressInformation`): it's what the carrier looks for. |
+
+**Decisions.**
+- **Times.** `mappers/dates.to_system_datetime` is the one helper for bol timestamps (offset → naive system time
+  zone). The cutover guard (`import_orders_placed_after`) and `transaction_date` use it.
+- **Mapper** `mappers/order.to_sales_order` is pure and returns `None` when no FBR unit is left to ship (checked
+  before the country, so a closed order from elsewhere is skipped, not an error). Mapping errors are
+  `BolMappingError` with `reason` `unknown_ean | ambiguous_ean | country`; warnings are reason-coded dicts the
+  flow words as translated comments.
+- **Items** are found by EAN with `offers.items_by_ean` (all GTIN forms, ADR-007; renamed from `_items_by_ean`).
+  The offer reference is compared with the item_code cut to 100 characters (ADR-008).
+- **Taxes.** The template rows are copied with ERPNext's `get_taxes_and_charges`. Bol Settings refuses a template
+  of another company, one without rows, or one with a row not *included in print rate*.
+- **Warehouse.** The order lines use the existing *Warehouse* setting (story 06); it's required for Import Orders too.
+- **Failures** roll back to the savepoint (addresses included), `log_once("order", order_id)` with the full order
+  payload (or the bol call, for a GET failure), and the poll continues. A failing order list is logged once per 6 h
+  (`bol:failed:orders:list`) and fails the job.
+- `sync_existing_order_changes(ids)` receives the already imported open orders; it's a no-op until story 10.
+- **Tests.** The test site has no Company: `tests/utils.make_order_masters` builds `_Test bol Company` (standard
+  chart, NL, EUR), a default Address Template, two inclusive templates and a Customer once and commits them.
+  `test_bol_settings.py` adds Customer and Sales Taxes and Charges Template to `test_ignore` (ADR-005).
+- **Demo environment (checked live, GETs only).** The list returns 4 canned orders. Three have every unit shipped and
+  are skipped. `1042831430` (BE, one open unit, EAN 8717418510749, `unitPrice` 10.30 with a 9.99 discount on
+  3 units) imported as a submitted SO on `dev.localhost` with the BE template, the item's bol ids, the Brussels
+  address (extension `B`) and a separate billing address. The demo's `totalPrice` doesn't match its unit price and
+  discount, so that SO got the rounding comment, plus a reference comment (the demo's reference `MijnOffer1121`).

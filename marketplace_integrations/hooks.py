@@ -187,6 +187,7 @@ scheduler_events = {
 			"marketplace_integrations.bol.process_status.poll_pending",
 			"marketplace_integrations.bol.stock.poll_stock",
 		],
+		"*/5 * * * *": ["marketplace_integrations.bol.orders.poll_orders"],
 		# Early morning, after the daily offer reconcile has re-queued offers missing at bol.
 		"0 5 * * *": ["marketplace_integrations.bol.stock.reconcile_stock"],
 	},

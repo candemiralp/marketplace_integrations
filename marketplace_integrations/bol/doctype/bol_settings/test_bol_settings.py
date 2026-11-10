@@ -8,11 +8,18 @@ from frappe.tests.utils import FrappeTestCase
 
 from marketplace_integrations.bol.api.errors import BolAuthError, BolTransientError
 from marketplace_integrations.bol.doctype.bol_settings import bol_settings
-from marketplace_integrations.bol.tests.utils import make_price_list, make_warehouse
+from marketplace_integrations.bol.tests.utils import (
+	TEST_COMPANY_ABBR,
+	make_order_masters,
+	make_price_list,
+	make_tax_template,
+	make_warehouse,
+)
 
 # These tests need no Company; ERPNext's Company test records need ERPNext's full test setup.
 # Warehouse links to Company too: the stock tests create a warehouse of their own (tests/utils.make_warehouse).
-test_ignore = ["Company", "Warehouse"]
+# The order import settings link Customer and tax templates: tests/utils.make_order_masters creates them.
+test_ignore = ["Company", "Warehouse", "Customer", "Sales Taxes and Charges Template"]
 
 
 class TestBolSettings(FrappeTestCase):
@@ -160,6 +167,64 @@ class TestStockSyncSettings(FrappeTestCase):
 	def test_needs_a_warehouse(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Warehouse"):
 			self._settings(warehouse=None).validate()
+
+	def test_group_warehouse_rejected(self):
+		group = make_warehouse("_Test bol Group Warehouse", is_group=1)
+		with self.assertRaisesRegex(frappe.ValidationError, "group"):
+			self._settings(warehouse=group).validate()
+
+
+class TestOrderImportSettings(FrappeTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		cls.masters = make_order_masters()
+
+	def setUp(self):
+		self.addCleanup(frappe.db.rollback)
+
+	def _settings(self, **values):
+		doc = frappe.get_single("Bol Settings")
+		doc.update(
+			{
+				"enabled": 0,
+				"sync_offers": 0,
+				"sync_stock": 0,
+				"import_orders": 1,
+				"company": self.masters.company,
+				"customer": self.masters.customer,
+				"warehouse": self.masters.warehouse,
+				"tax_template_nl": self.masters.tax_template_nl,
+				"tax_template_be": self.masters.tax_template_be,
+				**values,
+			}
+		)
+		return doc
+
+	def test_valid(self):
+		self._settings().validate()
+
+	def test_off_needs_nothing(self):
+		self._settings(import_orders=0, customer=None, tax_template_nl=None, tax_template_be=None).validate()
+
+	def test_needs_customer_warehouse_and_templates(self):
+		doc = self._settings(customer=None, warehouse=None, tax_template_nl=None, tax_template_be=None)
+
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			doc.validate()
+		for label in ("Customer", "Warehouse", "Tax Template NL", "Tax Template BE"):
+			self.assertIn(label, str(ctx.exception))
+
+	def test_template_with_vat_on_top_rejected(self):
+		account = f"_Test bol VAT NL - {TEST_COMPANY_ABBR}"
+		exclusive = make_tax_template("_Test bol VAT NL excl", account, included=0)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "included in Basic Rate"):
+			self._settings(tax_template_nl=exclusive.name).validate()
+
+	def test_template_of_another_company_rejected(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "belongs to company"):
+			self._settings(company="_Test bol Other Company").validate()
 
 	def test_group_warehouse_rejected(self):
 		group = make_warehouse("_Test bol Group Warehouse", is_group=1)
