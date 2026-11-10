@@ -48,6 +48,7 @@ doctype_js = {
 	"Brand": "public/js/brand.js",
 	"Delivery Note": "public/js/delivery_note.js",
 	"Item": "public/js/item.js",
+	"Sales Order": "public/js/sales_order.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -184,6 +185,10 @@ doc_events = {
 		"on_update_after_submit": "marketplace_integrations.bol.shipments.on_update_after_submit_delivery_note",
 		"before_cancel": "marketplace_integrations.bol.shipments.before_cancel_delivery_note",
 	},
+	"Sales Order": {
+		"onload": "marketplace_integrations.bol.cancellations.onload_sales_order",
+		"before_cancel": "marketplace_integrations.bol.cancellations.before_cancel_sales_order",
+	},
 }
 
 # doc_events = {
@@ -213,6 +218,7 @@ scheduler_events = {
 	"daily": [
 		"marketplace_integrations.bol.process_status.delete_old_processes",
 		"marketplace_integrations.bol.offers.reconcile_offers",
+		"marketplace_integrations.bol.cancellations.sync_recent_orders",
 	],
 }
 

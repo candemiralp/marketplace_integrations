@@ -50,8 +50,30 @@ class FakeOrders:
 		if error:
 			raise error
 		if path == orders.PATH:
-			return {"orders": [{"orderId": order_id, "orderItems": []} for order_id in self._page(params)]}
+			return {"orders": [self.reduced(order_id) for order_id in self._page(params)]}
 		return copy.deepcopy(self.orders[path.rsplit("/", 1)[1]])
+
+	def reduced(self, order_id: str) -> dict:
+		"""The order as bol's list shows it (ReducedOrder)."""
+		order = self.orders.get(order_id) or {"orderItems": []}
+		return {
+			"orderId": order_id,
+			"orderPlacedDateTime": order.get("orderPlacedDateTime"),
+			"orderItems": [
+				{
+					"orderItemId": item["orderItemId"],
+					"ean": item["product"]["ean"],
+					"fulfilmentMethod": item["fulfilment"]["method"],
+					"fulfilmentStatus": "OPEN",
+					"quantity": item["quantity"],
+					"quantityShipped": item["quantityShipped"],
+					"quantityCancelled": item["quantityCancelled"],
+					"cancellationRequest": item["cancellationRequest"],
+					"latestChangedDateTime": item["latestChangedDateTime"],
+				}
+				for item in order["orderItems"]
+			],
+		}
 
 	def details(self) -> list[str]:
 		return [path.rsplit("/", 1)[1] for path, _params in self.calls if path != orders.PATH]
@@ -259,6 +281,18 @@ class TestImport(OrderImportTestCase):
 		self.assertEqual(self._error_logs(), [])
 
 
+class TestCancelledBeforeImport(OrderImportTestCase):
+	def test_units_bol_cancelled_before_import_are_recorded(self):
+		order = self._add("A1")
+		order["orderItems"][0].update(quantity=3, quantityCancelled=1, totalPrice=74.85)
+
+		orders.poll_orders()
+
+		shirt = self._sales_order("A1").items[0]
+		# qty is net of them already; story 10 takes off only what bol cancels after this.
+		self.assertEqual((shirt.qty, shirt.bol_qty_cancelled), (2, 1))
+
+
 class TestIdempotency(OrderImportTestCase):
 	def test_polled_twice_gives_one_sales_order(self):
 		self._add("A1")
@@ -275,10 +309,11 @@ class TestIdempotency(OrderImportTestCase):
 		orders.poll_orders()
 		self._add("A2")
 
-		with patch.object(orders, "sync_existing_order_changes") as sync:
+		with patch.object(orders.cancellations, "sync_existing_order_changes") as sync:
 			orders.poll_orders()
 
-		sync.assert_called_once_with(["A1"])
+		# With bol's list entries: they carry what cancellations need.
+		sync.assert_called_once_with([self.bol.reduced("A1")], self.bol)
 		self.assertEqual(len(self._sales_orders("A2")), 1)
 
 	def test_concurrent_import_already_committed_is_no_failure(self):

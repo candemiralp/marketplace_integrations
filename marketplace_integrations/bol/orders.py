@@ -6,7 +6,7 @@ from erpnext.controllers.accounts_controller import get_taxes_and_charges
 from frappe import _
 from frappe.utils import get_datetime, get_system_timezone, now_datetime
 
-from marketplace_integrations.bol import offers
+from marketplace_integrations.bol import cancellations, offers
 from marketplace_integrations.bol.api.client import get_client
 from marketplace_integrations.bol.api.errors import BolError
 from marketplace_integrations.bol.log import log_once
@@ -36,11 +36,12 @@ def poll_orders():
 		return
 	client = get_client()
 	try:
-		order_ids = open_order_ids(client)
+		open_list = open_orders(client)
 	except BolError as e:
 		# The next poll tries again; one log per 6 hours is enough.
 		log_once("orders", "list", **e.details, error=e)
 		raise
+	order_ids = [order["orderId"] for order in open_list]
 	existing = set(
 		frappe.get_all("Sales Order", filters={"bol_order_id": ("in", order_ids)}, pluck="bol_order_id")
 		if order_ids
@@ -51,30 +52,27 @@ def poll_orders():
 			import_order(order_id, client)
 			# One order per transaction (overview §4.1 rule 4).
 			frappe.db.commit()  # nosemgrep
-	sync_existing_order_changes([order_id for order_id in order_ids if order_id in existing])
+	cancellations.sync_existing_order_changes(
+		[order for order in open_list if order["orderId"] in existing], client
+	)
 
 
-def open_order_ids(client) -> list[str]:
-	"""The ids of bol's open FBR orders, in bol's order, each once. Pages until bol sends an empty page."""
-	order_ids = []
+def open_orders(client) -> list[dict]:
+	"""bol's open FBR orders as listed (ReducedOrder), in bol's order, each once. Pages until bol sends an empty page."""
+	listed = {}
 	page = 1
 	while True:
 		response = client.request(
 			"GET", PATH, version=VERSION, params={"fulfilment-method": FBR, "status": "OPEN", "page": page}
 		)
-		page_ids = [
-			order.get("orderId") for order in (response or {}).get("orders") or [] if order.get("orderId")
-		]
-		# A new order can shift the pages between two requests: an id seen on the last page counts once.
-		order_ids.extend(order_id for order_id in page_ids if order_id not in order_ids)
-		if not page_ids or client.settings.environment == "Demo":
+		page_orders = [order for order in (response or {}).get("orders") or [] if order.get("orderId")]
+		for order in page_orders:
+			# A new order can shift the pages between two requests: an order seen on the last page counts once.
+			listed.setdefault(order["orderId"], order)
+		if not page_orders or client.settings.environment == "Demo":
 			# The demo has only page 1 (page 2 is a 400, "resource not available").
-			return order_ids
+			return list(listed.values())
 		page += 1
-
-
-def sync_existing_order_changes(order_ids: list[str]):
-	"""Cancellations and changes on orders that were imported already: story 10."""
 
 
 def import_order(order_id: str, client=None) -> str | None:

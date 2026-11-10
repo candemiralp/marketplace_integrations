@@ -197,6 +197,8 @@ def _line(line: dict, quantity: int, ctx: dict, warnings: list) -> dict:
 		"bol_latest_delivery_date": fulfilment.get("latestDeliveryDate")
 		or fulfilment.get("exactDeliveryDate"),
 		"bol_commission": money(line.get("commission")),
+		# qty leaves these units out already: story 10 subtracts only what bol cancels after this.
+		"bol_qty_cancelled": line.get("quantityCancelled") or 0,
 	}
 
 

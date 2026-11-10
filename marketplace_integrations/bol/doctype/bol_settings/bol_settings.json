@@ -31,6 +31,7 @@
   "orders_column",
   "tax_template_nl",
   "tax_template_be",
+  "notify_user",
   "shipments_section",
   "push_shipments",
   "require_track_and_trace",
@@ -209,6 +210,13 @@
    "options": "Sales Taxes and Charges Template"
   },
   {
+   "description": "Gets a ToDo when a buyer asks to cancel a bol order.",
+   "fieldname": "notify_user",
+   "fieldtype": "Link",
+   "label": "Notify User",
+   "options": "User"
+  },
+  {
    "fieldname": "shipments_section",
    "fieldtype": "Section Break",
    "label": "Shipments"
@@ -276,7 +284,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 20:47:34.030632",
+ "modified": "2026-11-10 22:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",

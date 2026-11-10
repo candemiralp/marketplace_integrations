@@ -289,6 +289,26 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"insert_after": "bol_latest_delivery_date",
 			"read_only": 1,
 		},
+		# Cancellations (story 10): what bol has cancelled of this line so far, and whether the buyer asked to.
+		# The line's qty is already net of bol_qty_cancelled.
+		{
+			"fieldname": "bol_qty_cancelled",
+			"fieldtype": "Float",
+			"label": "bol Qty Cancelled",
+			"insert_after": "bol_commission",
+			"read_only": 1,
+			"no_copy": 1,
+			"allow_on_submit": 1,
+		},
+		{
+			"fieldname": "bol_cancellation_requested",
+			"fieldtype": "Check",
+			"label": "bol Cancellation Requested",
+			"insert_after": "bol_qty_cancelled",
+			"read_only": 1,
+			"no_copy": 1,
+			"allow_on_submit": 1,
+		},
 	],
 	# Buyer addresses created by the order import: they hold buyer PII (cleaned up in story 15).
 	"Address": [
