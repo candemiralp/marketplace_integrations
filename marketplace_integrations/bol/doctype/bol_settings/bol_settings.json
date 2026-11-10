@@ -41,7 +41,9 @@
   "use_vvb",
   "vvb_for_retailer_items",
   "vvb_column",
-  "vvb_preferred_transporter"
+  "vvb_preferred_transporter",
+  "returns_section",
+  "handle_returns"
  ],
  "fields": [
   {
@@ -210,7 +212,7 @@
    "options": "Sales Taxes and Charges Template"
   },
   {
-   "description": "Gets a ToDo when a buyer asks to cancel a bol order.",
+   "description": "Gets a ToDo when a buyer asks to cancel a bol order, and for every bol return to inspect.",
    "fieldname": "notify_user",
    "fieldtype": "Link",
    "label": "Notify User",
@@ -278,13 +280,25 @@
    "fieldname": "vvb_preferred_transporter",
    "fieldtype": "Data",
    "label": "Preferred Label Transporter"
+  },
+  {
+   "fieldname": "returns_section",
+   "fieldtype": "Section Break",
+   "label": "Returns"
+  },
+  {
+   "default": "0",
+   "description": "Every 30 minutes, turn each unhandled FBR bol return into a draft return Delivery Note against the Delivery Note that shipped it. Submitting it reports the handling result to bol. Notify User (Orders section) gets a ToDo for each return.",
+   "fieldname": "handle_returns",
+   "fieldtype": "Check",
+   "label": "Handle Returns"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 22:00:00.000000",
+ "modified": "2026-11-10 22:09:06.939214",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",

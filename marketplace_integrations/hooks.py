@@ -172,7 +172,10 @@ doc_events = {
 	},
 	"Brand": {"on_update": "marketplace_integrations.bol.offers.on_brand_update"},
 	"Delivery Note": {
-		"onload": "marketplace_integrations.bol.labels.onload_delivery_note",
+		"onload": [
+			"marketplace_integrations.bol.labels.onload_delivery_note",
+			"marketplace_integrations.bol.returns.onload_delivery_note",
+		],
 		"validate": [
 			"marketplace_integrations.bol.shipments.validate_delivery_note",
 			"marketplace_integrations.bol.labels.validate_delivery_note",
@@ -180,8 +183,12 @@ doc_events = {
 		"before_submit": [
 			"marketplace_integrations.bol.shipments.before_submit_delivery_note",
 			"marketplace_integrations.bol.labels.before_submit_delivery_note",
+			"marketplace_integrations.bol.returns.before_submit_delivery_note",
 		],
-		"on_submit": "marketplace_integrations.bol.shipments.on_submit_delivery_note",
+		"on_submit": [
+			"marketplace_integrations.bol.shipments.on_submit_delivery_note",
+			"marketplace_integrations.bol.returns.on_submit_delivery_note",
+		],
 		"on_update_after_submit": "marketplace_integrations.bol.shipments.on_update_after_submit_delivery_note",
 		"before_cancel": "marketplace_integrations.bol.shipments.before_cancel_delivery_note",
 	},
@@ -212,6 +219,7 @@ scheduler_events = {
 		],
 		"*/5 * * * *": ["marketplace_integrations.bol.orders.poll_orders"],
 		"*/10 * * * *": ["marketplace_integrations.bol.shipments.sweep_shipments"],
+		"*/30 * * * *": ["marketplace_integrations.bol.returns.poll_returns"],
 		# Early morning, after the daily offer reconcile has re-queued offers missing at bol.
 		"0 5 * * *": ["marketplace_integrations.bol.stock.reconcile_stock"],
 	},

@@ -1,4 +1,4 @@
-// bol shipment (story 08) and bol label (story 09) on a Delivery Note. bol's work happens in the background.
+// bol shipment (story 08), bol label (story 09) and bol return (story 11) on a Delivery Note. bol's work happens in the background.
 
 frappe.ui.form.on("Delivery Note", {
 	onload(frm) {
@@ -22,6 +22,7 @@ frappe.ui.form.on("Delivery Note", {
 		}
 		add_label_buttons(frm);
 		add_retry_button(frm);
+		add_return_buttons(frm);
 	},
 });
 
@@ -97,6 +98,87 @@ function retry_shipment(frm) {
 			frappe.show_alert({
 				message: __("bol shipment: {0}", [__(status)]),
 				indicator: { Confirmed: "green", Pending: "blue" }[status] || "red",
+			});
+			frm.reload_doc();
+		});
+}
+
+// bol returns (story 11): the draft is made by the returns poll; submitting it reports the handling result.
+function add_return_buttons(frm) {
+	if (!frm.doc.is_return || !frm.doc.bol_rma_id) {
+		return;
+	}
+	if (frm.doc.docstatus === 0 && frm.doc.__onload?.bol_returns_on) {
+		frm.add_custom_button(
+			__("Report to bol without stock return"),
+			() => report_without_return(frm),
+			__("bol")
+		);
+	}
+	if (frm.doc.docstatus === 1 && frm.doc.bol_return_status === "Failed") {
+		frm.add_custom_button(
+			__("Retry bol return report"),
+			() => retry_return_report(frm),
+			__("bol")
+		);
+	}
+}
+
+function report_without_return(frm) {
+	const results = frappe.meta
+		.get_docfield("Delivery Note", "bol_handling_result")
+		.options.split("\n")
+		.filter(Boolean);
+	const dialog = new frappe.ui.Dialog({
+		title: __("Report to bol without stock return"),
+		fields: [
+			{
+				fieldname: "handling_result",
+				fieldtype: "Select",
+				label: __("bol Handling Result"),
+				options: results,
+				default: frm.doc.bol_handling_result || "CUSTOMER_KEEPS_PRODUCT_PAID",
+				reqd: 1,
+			},
+			{
+				fieldtype: "HTML",
+				options: `<p class="text-muted">${__(
+					"bol is told {0} units were handled, and this draft return is deleted: no stock comes back.",
+					[frm.doc.bol_expected_qty]
+				)}</p>`,
+			},
+		],
+		primary_action_label: __("Report and delete draft"),
+		primary_action(values) {
+			dialog.hide();
+			frappe
+				.call({
+					method: "marketplace_integrations.bol.returns.report_without_return",
+					args: { dn_name: frm.doc.name, handling_result: values.handling_result },
+					freeze: true,
+				})
+				.then((r) => {
+					frappe.show_alert({ message: __("Reported to bol"), indicator: "green" });
+					frappe.set_route("Form", "Delivery Note", r.message.return_against);
+				});
+		},
+	});
+	dialog.show();
+}
+
+function retry_return_report(frm) {
+	frappe
+		.call({
+			method: "marketplace_integrations.bol.returns.retry_return_report",
+			args: { dn_name: frm.doc.name },
+			freeze: true,
+		})
+		.then((r) => {
+			const status = r.message && r.message.status;
+			// Open: sent, bol is processing it. The timeline says what happened.
+			frappe.show_alert({
+				message: __("bol return: {0}", [__(status)]),
+				indicator: { Reported: "green", Open: "blue" }[status] || "red",
 			});
 			frm.reload_doc();
 		});
