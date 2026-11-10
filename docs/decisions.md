@@ -380,7 +380,7 @@ ERPNext 15.124.5 and the demo environment.
 | `DuplicateEntryError` on `bol_order_id` = already imported | Frappe v15 raises **`UniqueValidationError(doctype, name, db_error)`** for a unique non-PK column (`DuplicateEntryError` is only for the primary key). When the other import has already committed, **ERPNext's `validate_po`** ("one Sales Order per customer PO", `po_no = orderId`) fails first, with a plain `ValidationError` | After any failure the order is rolled back to its savepoint; it counts as already imported (no log) when the error is the `bol_order_id` unique key or the Sales Order now exists. |
 | Poll job `job_id="bol_poll_orders"` with dedupe | Frappe v15's scheduler enqueues with `scheduled_job::<method>` and skips a run while the previous one is queued or running (ADR-006) | The cron (`*/5 * * * *`) calls `orders.poll_orders` directly. |
 | — | Lines carry `fulfilment.method` | Non-FBR lines are skipped (FBB is out of scope). |
-| `billingDetails.vatNumber` | Address has no VAT field | Not stored; the billing address is created only when its address fields differ from shipping. |
+| `billingDetails.vatNumber` | Also `kvkNumber`. Address has no VAT field, and every order is booked on the one bol customer, so `Customer.tax_id` can't hold it | **Buyer fields on the order** (owner decision, see below). The billing address is created only when its address fields differ from shipping. |
 | — | `pickupPointName` | Put first in `address_line2` (before `extraAddressInformation`): it's what the carrier looks for. |
 
 **Decisions.**
@@ -398,6 +398,14 @@ ERPNext 15.124.5 and the demo environment.
 - **Failures** roll back to the savepoint (addresses included), `log_once("order", order_id)` with the full order
   payload (or the bol call, for a GET failure), and the poll continues. A failing order list is logged once per 6 h
   (`bol:failed:orders:list`) and fails the job.
+- **One customer, buyer on the order** (owner decision, after comparing with ecommerce_integrations' Shopify flow,
+  which makes a Customer per Shopify customer). bol sends no customer id (the e-mail is a per-order relay address),
+  so buyers can't be recognised reliably, and bol pays out one net amount for many orders, which a single receivable
+  party matches. The invoice still has to name the buyer: Sales Order, Delivery Note and Sales Invoice get read-only
+  `bol_buyer_name`, `bol_buyer_company`, `bol_buyer_vat_number`, `bol_buyer_kvk_number`, taken from `billingDetails`
+  (the party that pays) or, without it, `shipmentDetails`. They aren't `no_copy`, so `make_delivery_note` and
+  `make_sales_invoice` carry them over. They are buyer PII, for the cleanup in story 15. Printing them on the invoice
+  instead of the customer name, and the VAT treatment of business buyers in BE, belong to story 12.
 - `sync_existing_order_changes(ids)` receives the already imported open orders; it's a no-op until story 10.
 - **Tests.** The test site has no Company: `tests/utils.make_order_masters` builds `_Test bol Company` (standard
   chart, NL, EUR), a default Address Template, two inclusive templates and a Customer once and commits them.

@@ -62,7 +62,9 @@ def open_order_ids(client) -> list[str]:
 		response = client.request(
 			"GET", PATH, version=VERSION, params={"fulfilment-method": FBR, "status": "OPEN", "page": page}
 		)
-		page_ids = [order.get("orderId") for order in (response or {}).get("orders") or [] if order.get("orderId")]
+		page_ids = [
+			order.get("orderId") for order in (response or {}).get("orders") or [] if order.get("orderId")
+		]
 		# A new order can shift the pages between two requests: an id seen on the last page counts once.
 		order_ids.extend(order_id for order_id in page_ids if order_id not in order_ids)
 		if not page_ids or client.settings.environment == "Demo":

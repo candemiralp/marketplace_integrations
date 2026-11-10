@@ -77,7 +77,9 @@ class TestSalesOrder(unittest.TestCase):
 
 		self.assertEqual(so["delivery_date"], "2026-11-11")
 		self.assertEqual([item["delivery_date"] for item in so["items"]], ["2026-11-11"] * 2)
-		self.assertEqual([item["bol_latest_delivery_date"] for item in so["items"]], ["2026-11-12", "2026-11-11"])
+		self.assertEqual(
+			[item["bol_latest_delivery_date"] for item in so["items"]], ["2026-11-12", "2026-11-11"]
+		)
 
 	def test_exact_delivery_date_when_there_is_no_latest(self):
 		result = order()
@@ -110,7 +112,9 @@ class TestSalesOrder(unittest.TestCase):
 		self.assertEqual([item["delivery_date"] for item in so["items"]], ["2026-11-10"] * 2)
 
 	def test_netherlands_gets_the_nl_template(self):
-		self.assertEqual(to_sales_order(order(), context())["sales_order"]["taxes_and_charges"], "VAT NL incl")
+		self.assertEqual(
+			to_sales_order(order(), context())["sales_order"]["taxes_and_charges"], "VAT NL incl"
+		)
 
 	def test_belgium_gets_the_be_template(self):
 		result = order()
@@ -226,12 +230,16 @@ class TestDiscounts(unittest.TestCase):
 		mapped = to_sales_order(result, context())
 		shirt = mapped["sales_order"]["items"][0]
 
-		self.assertEqual((shirt["price_list_rate"], shirt["discount_amount"], shirt["rate"]), (24.95, 2.45, 22.5))
+		self.assertEqual(
+			(shirt["price_list_rate"], shirt["discount_amount"], shirt["rate"]), (24.95, 2.45, 22.5)
+		)
 		self.assertEqual(mapped["warnings"], [])
 
 	def test_discount_that_does_not_split_into_cents_warns(self):
 		# The spec's example: 10 × 12.99 − 10.99 = 118.91, which is not 10 × a whole-cent rate.
-		result = line(0, quantity=10, unitPrice=12.99, discounts=[{"title": "x", "amount": 10.99}], totalPrice=118.91)
+		result = line(
+			0, quantity=10, unitPrice=12.99, discounts=[{"title": "x", "amount": 10.99}], totalPrice=118.91
+		)
 
 		mapped = to_sales_order(result, context())
 		shirt = mapped["sales_order"]["items"][0]
@@ -282,7 +290,9 @@ class TestAddresses(unittest.TestCase):
 		result = order()
 		result["shipmentDetails"]["company"] = "Borduurwerk B.V."
 
-		self.assertEqual(to_sales_order(result, context())["shipping_address"]["address_title"], "Borduurwerk B.V.")
+		self.assertEqual(
+			to_sales_order(result, context())["shipping_address"]["address_title"], "Borduurwerk B.V."
+		)
 
 	def test_pick_up_point_name_comes_first_on_line_two(self):
 		result = order(pickupPoint=True)
@@ -301,7 +311,11 @@ class TestAddresses(unittest.TestCase):
 	def test_different_billing_address_is_separate(self):
 		result = order()
 		result["billingDetails"].update(
-			streetName="Kerkstraat", houseNumber="12", houseNumberExtension=None, city="Amsterdam", zipCode="1017GA"
+			streetName="Kerkstraat",
+			houseNumber="12",
+			houseNumberExtension=None,
+			city="Amsterdam",
+			zipCode="1017GA",
 		)
 
 		mapped = to_sales_order(result, context())
@@ -320,6 +334,57 @@ class TestAddresses(unittest.TestCase):
 		with self.assertRaises(BolMappingError) as ctx:
 			to_sales_order(result, context())
 		self.assertEqual(ctx.exception.reason, "country")
+
+
+class TestBuyer(unittest.TestCase):
+	def _buyer(self, result: dict) -> dict:
+		so = to_sales_order(result, context())["sales_order"]
+		return {key: value for key, value in so.items() if key.startswith("bol_buyer_")}
+
+	def test_consumer(self):
+		self.assertEqual(
+			self._buyer(order()),
+			{
+				"bol_buyer_name": "Billie Jansen",
+				"bol_buyer_company": None,
+				"bol_buyer_vat_number": None,
+				"bol_buyer_kvk_number": None,
+			},
+		)
+
+	def test_business_buyer_with_vat_and_kvk_numbers(self):
+		result = order()
+		result["billingDetails"].update(
+			company="Borduurwerk B.V.", vatNumber="NL999999999B99", kvkNumber="99887766"
+		)
+
+		self.assertEqual(
+			self._buyer(result),
+			{
+				"bol_buyer_name": "Billie Jansen",
+				"bol_buyer_company": "Borduurwerk B.V.",
+				"bol_buyer_vat_number": "NL999999999B99",
+				"bol_buyer_kvk_number": "99887766",
+			},
+		)
+
+	def test_the_billing_party_is_the_buyer_not_the_recipient(self):
+		# A gift: shipped to someone else, paid for by the billing party.
+		result = order()
+		result["shipmentDetails"].update(firstName="Sam", surname="de Vries")
+
+		self.assertEqual(self._buyer(result)["bol_buyer_name"], "Billie Jansen")
+
+	def test_without_billing_details_the_recipient_is_the_buyer(self):
+		result = order(billingDetails=None)
+		result["shipmentDetails"].update(firstName="Sam", surname="de Vries", company="Atelier Sam")
+
+		buyer = self._buyer(result)
+
+		self.assertEqual(
+			(buyer["bol_buyer_name"], buyer["bol_buyer_company"]), ("Sam de Vries", "Atelier Sam")
+		)
+		self.assertIsNone(buyer["bol_buyer_vat_number"])
 
 
 class TestTimes(unittest.TestCase):
