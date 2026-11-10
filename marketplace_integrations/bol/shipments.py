@@ -50,7 +50,7 @@ def validate_delivery_note(doc, method=None):
 	if doc.is_return:
 		return
 	line_orders = _line_orders(doc)
-	order_ids = sorted(set(filter(None, line_orders)))
+	order_ids = sorted({order_id for order_id in line_orders if order_id})
 	doc.bol_order_id = order_ids[0] if len(order_ids) == 1 else None
 	if not order_ids or not shipments_on():
 		return
@@ -113,7 +113,9 @@ def on_update_after_submit_delivery_note(doc, method=None):
 
 def before_cancel_delivery_note(doc, method=None):
 	if doc.bol_shipment_status in (PENDING, CONFIRMED):
-		frappe.throw(_("Shipment already confirmed on bol; process a return instead."), title=_("bol Shipment"))
+		frappe.throw(
+			_("Shipment already confirmed on bol; process a return instead."), title=_("bol Shipment")
+		)
 	if doc.bol_shipment_status == UNKNOWN:
 		frappe.throw(
 			_("bol may already have this shipment. Retry it first: that checks bol before anything is sent."),
@@ -211,14 +213,16 @@ def _confirm_failed(dn, error: BolError):
 		if _log_failure(dn, error, once="shipment"):
 			dn.add_comment(
 				"Comment",
-				_("bol couldn't be reached to confirm the shipment ({0}). It's tried again automatically.").format(
-					str(error)
-				),
+				_(
+					"bol couldn't be reached to confirm the shipment ({0}). It's tried again automatically."
+				).format(str(error)),
 			)
 		return
 	# Rejected data, credentials, our data (no whole units, no transporter), an unexpected answer: a person acts.
 	if isinstance(error, BolValidationError):
-		message = _("bol rejected the shipment: {0}").format(format_violations(error.violations) or str(error))
+		message = _("bol rejected the shipment: {0}").format(
+			format_violations(error.violations) or str(error)
+		)
 	else:
 		message = _("Shipment not confirmed at bol: {0}").format(str(error))
 	_set_status(dn, FAILED)

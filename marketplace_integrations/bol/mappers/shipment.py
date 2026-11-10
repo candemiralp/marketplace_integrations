@@ -48,7 +48,8 @@ def build_shipment(
 	"""The ShipmentRequest body. A bol label (story 09) replaces the transport: bol knows its carrier."""
 	shipment = {
 		"orderItems": [
-			{"orderItemId": order_item_id, "quantity": qty} for order_item_id, qty in quantities(lines).items()
+			{"orderItemId": order_item_id, "quantity": qty}
+			for order_item_id, qty in quantities(lines).items()
 		],
 		"shipmentReference": reference,
 	}
@@ -61,7 +62,9 @@ def build_shipment(
 	return shipment
 
 
-def candidates(shipments: list[dict], reference: str, order_item_ids: set[str], taken: set[str]) -> list[dict]:
+def candidates(
+	shipments: list[dict], reference: str, order_item_ids: set[str], taken: set[str]
+) -> list[dict]:
 	"""bol shipments (list entries) that may be ours: our reference, or exactly our order items.
 
 	`taken` are shipment ids already recorded on other Delivery Notes. The list doesn't always carry the
