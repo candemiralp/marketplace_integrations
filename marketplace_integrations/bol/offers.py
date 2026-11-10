@@ -43,7 +43,14 @@ def adopt_existing_offers() -> dict:
 
 	Only reads from bol. Safe to run again: the mapping is keyed on the offerId.
 	"""
-	report = {"pages": 0, "cursor": None, "counts": dict.fromkeys(OUTCOMES, 0), **{key: [] for key in REPORTED}}
+	report = {
+		"pages": 0,
+		"cursor": None,
+		"counts": dict.fromkeys(OUTCOMES, 0),
+		"repeated": 0,
+		**{key: [] for key in REPORTED},
+	}
+	seen = set()
 	try:
 		client = get_client()
 		while True:
@@ -51,12 +58,20 @@ def adopt_existing_offers() -> dict:
 			response = client.request("GET", PATH, version=VERSION, params=params) or {}
 			report["pages"] += 1
 			for offer in response.get("offers") or []:
+				if offer.get("offerId") in seen:
+					# Already handled in this run: counting it again would inflate the report.
+					report["repeated"] += 1
+					continue
+				seen.add(offer.get("offerId"))
 				_adopt(offer, report)
 				# One offer per transaction (overview §4.1 rule 4).
 				frappe.db.commit()  # nosemgrep
 			next_cursor = (response.get("page") or {}).get("nextCursor")
 			if next_cursor and next_cursor == report["cursor"]:
-				# Following it would loop forever (bol's demo does this); stopping quietly could hide offers.
+				if client.settings.environment == "Demo":
+					# The demo answers every request with the spec's example cursor: that's its last page.
+					break
+				# Following it would loop forever; stopping quietly could hide offers.
 				raise BolError(f"bol returned the same page cursor again: {next_cursor}")
 			report["cursor"] = next_cursor
 			if not next_cursor:

@@ -33,19 +33,23 @@ def validate_item(doc, method=None):
 def _publish_problems(doc) -> list[str]:
 	problems = []
 	if doc.has_variants:
-		problems.append(_("{0} is a template with variants. Tick Sell on bol on its variants instead.").format(doc.name))
+		problems.append(
+			_("{0} is a template with variants. Tick Sell on bol on its variants instead.").format(doc.name)
+		)
 	if not doc.is_stock_item:
 		problems.append(_("{0} is not a stock item. Only stock items can be sold on bol.").format(doc.name))
 	ean_problem = _ean_problem(doc)
 	if ean_problem:
 		problems.append(ean_problem)
 	if not doc.brand:
-		problems.append(_("Set a Brand on {0}. Its bol economic operator comes from the Brand.").format(doc.name))
+		problems.append(
+			_("Set a Brand on {0}. Its bol economic operator comes from the Brand.").format(doc.name)
+		)
 	elif not frappe.db.get_value("Brand", doc.brand, "bol_economic_operator_id"):
 		problems.append(
-			_("Brand {0} has no bol economic operator. Use Select bol economic operator on the Brand.").format(
-				doc.brand
-			)
+			_(
+				"Brand {0} has no bol economic operator. Use Select bol economic operator on the Brand."
+			).format(doc.brand)
 		)
 	min_days, max_days = cint(doc.get("bol_min_days")), cint(doc.get("bol_max_days"))
 	if min_days and max_days and min_days > max_days:
@@ -89,7 +93,9 @@ def list_economic_operators() -> list[dict]:
 			break
 		except BolError as e:
 			log_call(**e.details, error=e)
-			frappe.throw(_("Could not load the economic operators from bol: {0}").format(str(e)), title=_("bol Error"))
+			frappe.throw(
+				_("Could not load the economic operators from bol: {0}").format(str(e)), title=_("bol Error")
+			)
 		# Keyed by id: a page can repeat an operator (bol's demo does).
 		operators.update({op["id"]: _operator(op) for op in response.get("operators") or []})
 		if page >= cint((response.get("page") or {}).get("numberOfPages")):
@@ -130,8 +136,12 @@ def _fetch_operator(operator_id: str, brand_doc) -> dict:
 	except BolError as e:
 		log_call(**e.details, error=e, reference=(brand_doc.doctype, brand_doc.name))
 		if isinstance(e, BolNotFoundError):
-			frappe.throw(_("bol has no economic operator with ID {0}.").format(operator_id), title=_("Not Found"))
-		frappe.throw(_("Could not check the economic operator at bol: {0}").format(str(e)), title=_("bol Error"))
+			frappe.throw(
+				_("bol has no economic operator with ID {0}.").format(operator_id), title=_("Not Found")
+			)
+		frappe.throw(
+			_("Could not check the economic operator at bol: {0}").format(str(e)), title=_("bol Error")
+		)
 
 
 def _client():

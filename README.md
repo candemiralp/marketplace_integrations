@@ -95,7 +95,8 @@ Shopify↔bol app) are linked to their Items, never created again.
      Nothing was changed. Correct or delete the wrong *Ecommerce Item*.
    - **failed**: unexpected error. There is a separate error log with the traceback.
 4. Run it again after fixing: already linked offers are left as they are. If bol couldn't be reached,
-   the job stops, logs how far it got, and a rerun is safe.
+   or kept sending the same page, the job stops, logs how far it got, and a rerun is safe. An offer
+   bol sends twice is counted once (`repeated` in the report says how often that happened).
 
 **For developers** (details in `docs/decisions.md`, ADR-004/005):
 

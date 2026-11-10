@@ -42,7 +42,9 @@ class TestGtin13(unittest.TestCase):
 
 class TestGetItemEan(unittest.TestCase):
 	def test_one_ean(self):
-		self.assertEqual(get_item_ean(item(("4006381333931", "EAN"), ("ABC-123", "CODE-39"))), "4006381333931")
+		self.assertEqual(
+			get_item_ean(item(("4006381333931", "EAN"), ("ABC-123", "CODE-39"))), "4006381333931"
+		)
 
 	def test_no_ean(self):
 		for barcodes in ((), (("012345678905", "UPC-A"),), (("4006381333931", ""),)):
