@@ -311,10 +311,15 @@ class TestValidation(ShipmentTestCase):
 		self.assertEqual(self._state(dn), ("Pending", None))
 
 	def test_items_bol_ships_need_no_track_and_trace(self):
-		dn = self._delivery_note(self._sales_order(party="BOL"), track_and_trace=None)
+		dn = self._delivery_note(self._sales_order(party="BOL"), submit=False, track_and_trace=None)
+		# Their bol label (story 09, test_labels) is what they need.
+		dn.db_set({"bol_label_status": "Ready", "bol_shipping_label_id": "label-1"})
+		dn.reload()
+
+		dn.submit()
 
 		self.assertEqual(self._state(dn)[0], "Pending")
-		# No transporter of ours either: bol's label (story 09) names it.
+		# No transporter of ours either: bol's label names it.
 		self.assertFalse(dn.bol_transporter_code)
 
 	def test_returns_are_left_alone(self):

@@ -35,7 +35,12 @@
   "push_shipments",
   "require_track_and_trace",
   "shipments_column",
-  "default_transporter_code"
+  "default_transporter_code",
+  "vvb_section",
+  "use_vvb",
+  "vvb_for_retailer_items",
+  "vvb_column",
+  "vvb_preferred_transporter"
  ],
  "fields": [
   {
@@ -234,13 +239,44 @@
    "label": "Default Transporter",
    "mandatory_depends_on": "eval:doc.push_shipments",
    "options": "TNT\nTNT-EXTRA\nTNT_BRIEF\nBRIEFPOST\nDHL\nDHLFORYOU\nDPD-NL\nDPD-BE\nBPOST_BE\nBPOST_BRIEF\nGLS\nUPS\nOTHER"
+  },
+  {
+   "fieldname": "vvb_section",
+   "fieldtype": "Section Break",
+   "label": "Verzenden via bol"
+  },
+  {
+   "default": "0",
+   "description": "Buy bol shipping labels from Delivery Notes (Get bol label). Needed for items bol ships itself (distribution party BOL). Register for Verzenden via bol in the seller dashboard first. Needs Push Shipments.",
+   "fieldname": "use_vvb",
+   "fieldtype": "Check",
+   "label": "Use Verzenden via bol"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.use_vvb",
+   "description": "Also offer Get bol label on Delivery Notes for items you ship yourself, e.g. when bol's label is cheaper than your own contract.",
+   "fieldname": "vvb_for_retailer_items",
+   "fieldtype": "Check",
+   "label": "bol Labels for Own Shipments"
+  },
+  {
+   "fieldname": "vvb_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.use_vvb",
+   "description": "bol's transporter code (e.g. TNT) to pick when bol recommends no label. Otherwise the cheapest label is bought.",
+   "fieldname": "vvb_preferred_transporter",
+   "fieldtype": "Data",
+   "label": "Preferred Label Transporter"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 23:30:00.000000",
+ "modified": "2026-11-10 20:47:34.030632",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",
