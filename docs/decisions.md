@@ -326,3 +326,39 @@ response. On the demo a sync therefore ends in `Not synced` (create without `off
   Mapped offers missing from the list and `bol_enabled` items without a mapping are queued too.
 - **Delete** (`delete_offer`, POST only) needs System Manager or Bol Manager plus Item read permission (as
   with the Brand operator, ADR-007). It writes with `db_set`, so unticking *Sell on bol* doesn't queue a sync.
+
+---
+
+## ADR-009 — Stock sync (story 06)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/offers-v11.yaml` (Offers API 11.5.0),
+`docs/bol-openapi/retailer-api-v10.json` and ERPNext 15.124.5.
+
+| Story says | Spec / ERPNext says | Decision |
+|---|---|---|
+| PATCH the offer's `stock {amount, managedByRetailer}` | `PATCH /retailer/offers/{id}` takes `stock` (`UpdateStock`, both fields optional) → 204 | Send both: `{"stock": {"amount": n, "managedByRetailer": false}}`, nothing else. Stock and the offer sync's fields never share a PATCH. |
+| Clamp to bol's maximum stock ("check the limit") | **v11 documents no maximum.** v10's `UpdateOfferStockRequest` and `StockCreate` have `minimum: 0, maximum: 999` | `BOL_MAX_STOCK = 999` (`mappers/stock.py`). Raise it if bol confirms a higher v11 limit. |
+| Trigger: `Bin.on_update` (doc_events) | **ERPNext never saves Bin as a document on stock moves.** `stock_ledger.update_bin_data/update_bin`, `bin.update_qty` (SO reservations) and `Bin.db_set` write with `frappe.db.set_value`, so `on_update` doesn't fire on DN, Stock Entry or SO submit | **Minute poll** (`stock.poll_stock`, cron `* * * * *`, owner's decision). One query computes ATS for every bol-enabled mapped Item (Item ⟕ Ecommerce Item ⟕ Bin) and queues `push_stock` only where ATS ≠ `bol_last_stock_pushed`. No bol calls. It catches every source (stock ledger, SO and SRE reservations, buffer edits, switching the sync on) and has no timestamp races. There is no Bin doc_event and no separate buffer trigger. |
+| Nightly reconcile: GET each offer | The offer **list** (`OfferResponse`) includes `stock {amount, correctedStock, managedByRetailer}` | One list pass (`offers.offer_pages`, as in ADR-008), daily at 05:00. A mismatch in `amount` **or** `managedByRetailer: true` (offers from the old Shopify app) is corrected. Mapped offers missing from the list are left to the offer reconcile, which recreates them. |
+| `correctedStock` is read-only | Confirmed (only on the response) | Never compared or sent: bol lowers it by its open orders, so comparing it would "correct" every offer with an open order. |
+| ATS = actual − `reserved_qty` − `reserved_stock` − buffer | `Bin.reserved_qty` counts **every** open SO line; `reserved_stock` (Stock Reservation Entries) reserves stock for those same lines | **Story formula kept** (owner). With Stock Reservation on (it's off by default and off on this bench), SRE quantities are subtracted twice: bol undersells, never oversells. |
+| `managedByRetailer` | `false`: bol subtracts **all** open orders from our amount; `true`: only orders placed after our last update | `false` (story). bol orders not yet imported as Sales Orders (story 07) are still subtracted by bol. Once imported they're in `reserved_qty`, and bol only counts them until they're shipped, so there's a short overlap that can only undersell. |
+
+**Decisions.**
+- **"Pushed" marker.** `bol_last_stock_pushed` is an Int (NOT NULL, 0), so a new or adopted mapping looks like
+  "0 pushed". `Ecommerce Item.inventory_synced_on` (1970-01-01 = never synced in ecommerce_integrations, which only
+  reads its own integration's rows) is set together with it. A mapping counts as up to date only when both
+  match. So an adopted offer and the first run after switching on *Sync Stock* are always pushed, even at 0.
+  Both are written **only after bol confirmed** (204, or a reconcile that saw the same value).
+- **Sync Stock requires Sync Offers** (owner). A 404 on push and an Item without an offer are handed to
+  `sync_offer`, which recreates or creates the offer with its stock (`_adopt_or_create` sends the ATS and records
+  it before the mapping is committed). With Sync Stock off a new offer still starts at 0.
+- **Settings.** *Warehouse* must be a non-group warehouse. *Stock Buffer* defaults to 1. Item *bol Stock Buffer*:
+  0 = Settings default (like the delivery days, ADR-007). An item can't override the buffer down to 0.
+- **Failures.** A push that fails is logged and commented once per 6 h (`bol:failed:stock:{item}`). The job fails and
+  nothing is stored, so the next poll (≤ 1 min) queues it again. A 404 isn't logged: the offer sync takes over.
+  Repeated failures cost one call per item per minute (deduplicated by `job_id=bol_stock::{item}`).
+- **Reconcile report.** One integration log line: `bol stock reconcile: X checked, Y corrected, Z failed.`
+  If the list fails, an Error log carries the counts so far and the job fails.
+- **Demo environment.** The demo rejects offer PATCHes with HTTP 403 (ADR-008), so pushes are covered by tests
+  against the in-memory fake of the offer endpoints. The poll was checked on the dev site with a real Stock Entry.

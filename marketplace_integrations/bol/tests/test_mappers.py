@@ -15,6 +15,12 @@ from marketplace_integrations.bol.mappers.offer import (
 	format_violations,
 	offer_status,
 )
+from marketplace_integrations.bol.mappers.stock import (
+	BOL_MAX_STOCK,
+	available_to_sell,
+	stock_body,
+	stock_matches,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 OFFERS = json.loads((FIXTURES / "offers_page_1.json").read_text())["offers"]
@@ -253,3 +259,45 @@ class TestFormatting(unittest.TestCase):
 			format_violations(violations),
 			"pricing.bundlePrices[0].unitPrice: must be at least 1\nean: invalid",
 		)
+
+
+class TestAvailableToSell(unittest.TestCase):
+	def test_reservations_and_buffer_are_subtracted(self):
+		self.assertEqual(available_to_sell(10, 3, 2, 1), 4)
+
+	def test_no_buffer(self):
+		self.assertEqual(available_to_sell(5, 0, 0, 0), 5)
+
+	def test_negative_is_zero(self):
+		self.assertEqual(available_to_sell(1, 3, 0, 1), 0)
+		self.assertEqual(available_to_sell(-4, 0, 0, 0), 0)
+
+	def test_clamped_to_bols_maximum(self):
+		self.assertEqual(available_to_sell(5000, 0, 0, 1), BOL_MAX_STOCK)
+
+	def test_fractions_are_rounded_down(self):
+		self.assertEqual(available_to_sell(3.5, 0, 0, 1), 2)
+
+	def test_float_noise_keeps_the_unit(self):
+		self.assertEqual(available_to_sell(0.1 + 0.2 + 2.7, 0, 0, 0), 3)
+		self.assertEqual(available_to_sell(2.9999999999, 0, 0, 0), 3)
+
+	def test_missing_values_count_as_zero(self):
+		self.assertEqual(available_to_sell(None, None, None, 1), 0)
+		self.assertEqual(available_to_sell(4, None, None, None), 4)
+
+
+class TestStockBody(unittest.TestCase):
+	def test_bol_subtracts_its_open_orders(self):
+		self.assertEqual(stock_body(3), {"amount": 3, "managedByRetailer": False})
+
+	def test_matches(self):
+		offer = {"stock": {"amount": 3, "correctedStock": 1, "managedByRetailer": False}}
+		self.assertTrue(stock_matches(offer, 3))
+		self.assertFalse(stock_matches(offer, 2))
+
+	def test_stock_managed_by_retailer_does_not_match(self):
+		self.assertFalse(stock_matches({"stock": {"amount": 3, "managedByRetailer": True}}, 3))
+
+	def test_offer_without_stock_does_not_match(self):
+		self.assertFalse(stock_matches({}, 0))

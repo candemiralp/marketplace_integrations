@@ -56,7 +56,15 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"insert_after": "bol_min_days",
 			"non_negative": 1,
 		},
-		{"fieldname": "bol_column", "fieldtype": "Column Break", "insert_after": "bol_max_days"},
+		{
+			"fieldname": "bol_stock_buffer",
+			"fieldtype": "Int",
+			"label": "bol Stock Buffer",
+			"description": "Units kept back from bol. 0 = default from Bol Settings.",
+			"insert_after": "bol_max_days",
+			"non_negative": 1,
+		},
+		{"fieldname": "bol_column", "fieldtype": "Column Break", "insert_after": "bol_stock_buffer"},
 		{
 			"fieldname": "bol_offer_status",
 			"fieldtype": "Data",

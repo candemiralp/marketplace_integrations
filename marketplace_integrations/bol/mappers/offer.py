@@ -1,6 +1,7 @@
 # bol offer (v11) JSON <-> plain values. Pure: no frappe imports.
 
 from marketplace_integrations.bol.api.errors import BolMappingError
+from marketplace_integrations.bol.mappers.stock import stock_body
 
 ON_HOLD = "On hold"
 FOR_SALE = "For sale"
@@ -10,7 +11,7 @@ MIN_PRICE, MAX_PRICE = 1, 9999
 REFERENCE_LENGTH = 100
 # The desired state of an offer that must be off sale: nothing else needs to be known for it.
 HOLD = {"onHoldByRetailer": True}
-# What the offer sync owns. `stock` belongs to the stock sync (story 06); `ean` and `condition` can't be patched.
+# What the offer sync owns. `stock` belongs to the stock sync (bol/stock.py); `ean` and `condition` can't be patched.
 PATCHABLE = ("economicOperatorId", "onHoldByRetailer", "reference", "pricing", "fulfilment")
 
 
@@ -42,7 +43,7 @@ def build_offer(item: dict, price: float, eo_id: str, min_days: int, max_days: i
 			"schedule": "MY_DELIVERY_PROMISE",
 			"deliveryPromise": {"minimumDaysToCustomer": min_days, "maximumDaysToCustomer": max_days},
 		},
-		"stock": {"amount": stock, "managedByRetailer": False},
+		"stock": stock_body(stock),
 	}
 
 

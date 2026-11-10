@@ -183,7 +183,12 @@ doc_events = {
 # (job id `scheduled_job::<method>`), so polls don't overlap (ADR-006).
 scheduler_events = {
 	"cron": {
-		"* * * * *": ["marketplace_integrations.bol.process_status.poll_pending"],
+		"* * * * *": [
+			"marketplace_integrations.bol.process_status.poll_pending",
+			"marketplace_integrations.bol.stock.poll_stock",
+		],
+		# Early morning, after the daily offer reconcile has re-queued offers missing at bol.
+		"0 5 * * *": ["marketplace_integrations.bol.stock.reconcile_stock"],
 	},
 	"daily": [
 		"marketplace_integrations.bol.process_status.delete_old_processes",

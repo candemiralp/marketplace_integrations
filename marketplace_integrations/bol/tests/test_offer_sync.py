@@ -32,7 +32,10 @@ PATH = "/retailer/offers"
 REASONS = {
 	"offerId": "x",
 	"countries": [
-		{"countryCode": "NL", "reasons": [{"category": "PRICE", "code": "4000-1", "description": "Price too high"}]}
+		{
+			"countryCode": "NL",
+			"reasons": [{"category": "PRICE", "code": "4000-1", "description": "Price too high"}],
+		}
 	],
 }
 
@@ -214,7 +217,14 @@ class TestSyncOffer(OfferSyncTestCase):
 		self.assertEqual(self._offer_id("_Test bol sync adopt"), offer_id)
 		self.assertEqual(
 			self.bol.writes(),
-			[("PATCH", f"{PATH}/{offer_id}", {"pricing": {"bundlePrices": [{"quantity": 1, "unitPrice": 9.99}]}}, None)],
+			[
+				(
+					"PATCH",
+					f"{PATH}/{offer_id}",
+					{"pricing": {"bundlePrices": [{"quantity": 1, "unitPrice": 9.99}]}},
+					None,
+				)
+			],
 		)
 
 	def test_unchanged_offer_is_not_patched(self):
@@ -233,7 +243,14 @@ class TestSyncOffer(OfferSyncTestCase):
 
 		self.assertEqual(
 			self.bol.writes(),
-			[("PATCH", f"{PATH}/{offer_id}", {"pricing": {"bundlePrices": [{"quantity": 1, "unitPrice": 12.5}]}}, None)],
+			[
+				(
+					"PATCH",
+					f"{PATH}/{offer_id}",
+					{"pricing": {"bundlePrices": [{"quantity": 1, "unitPrice": 12.5}]}},
+					None,
+				)
+			],
 		)
 
 	def test_disabled_item_is_put_on_hold_without_needing_a_price(self):
@@ -243,7 +260,9 @@ class TestSyncOffer(OfferSyncTestCase):
 
 		offers.sync_offer("_Test bol sync hold")
 
-		self.assertEqual(self.bol.writes(), [("PATCH", f"{PATH}/{offer_id}", {"onHoldByRetailer": True}, None)])
+		self.assertEqual(
+			self.bol.writes(), [("PATCH", f"{PATH}/{offer_id}", {"onHoldByRetailer": True}, None)]
+		)
 		self.assertEqual(self._status("_Test bol sync hold"), ("On hold", ""))
 
 	def test_unticked_item_is_put_on_hold(self):
@@ -252,7 +271,9 @@ class TestSyncOffer(OfferSyncTestCase):
 
 		offers.sync_offer("_Test bol sync untick")
 
-		self.assertEqual(self.bol.writes(), [("PATCH", f"{PATH}/{offer_id}", {"onHoldByRetailer": True}, None)])
+		self.assertEqual(
+			self.bol.writes(), [("PATCH", f"{PATH}/{offer_id}", {"onHoldByRetailer": True}, None)]
+		)
 		self.assertIn(offer_id, self.bol.offers)
 
 	def test_enabled_again_goes_back_on_sale(self):
@@ -264,7 +285,9 @@ class TestSyncOffer(OfferSyncTestCase):
 
 		offers.sync_offer("_Test bol sync back")
 
-		self.assertEqual(self.bol.writes(), [("PATCH", f"{PATH}/{offer_id}", {"onHoldByRetailer": False}, None)])
+		self.assertEqual(
+			self.bol.writes(), [("PATCH", f"{PATH}/{offer_id}", {"onHoldByRetailer": False}, None)]
+		)
 		self.assertEqual(self._status("_Test bol sync back"), ("For sale", ""))
 
 	def test_item_not_for_bol_without_offer_does_nothing(self):
@@ -425,7 +448,9 @@ class TestSyncOffer(OfferSyncTestCase):
 
 		offers.sync_offer("_Test bol sync reasons")
 
-		self.assertEqual(self._status("_Test bol sync reasons"), ("Not for sale", "NL: Price too high (4000-1)"))
+		self.assertEqual(
+			self._status("_Test bol sync reasons"), ("Not for sale", "NL: Price too high (4000-1)")
+		)
 
 	def test_item_days_override_the_settings(self):
 		offer_id = self._synced("_Test bol sync days")
@@ -435,7 +460,8 @@ class TestSyncOffer(OfferSyncTestCase):
 
 		patch_body = self.bol.writes()[0][2]
 		self.assertEqual(
-			patch_body["fulfilment"]["deliveryPromise"], {"minimumDaysToCustomer": 2, "maximumDaysToCustomer": 4}
+			patch_body["fulfilment"]["deliveryPromise"],
+			{"minimumDaysToCustomer": 2, "maximumDaysToCustomer": 4},
 		)
 		self.assertEqual(self.bol.offers[offer_id]["pricing"]["bundlePrices"][0]["unitPrice"], 9.99)
 
@@ -552,7 +578,9 @@ class TestReconcile(OfferSyncTestCase):
 		offers.reconcile_offers()
 
 		self.assertEqual(self._status("_Test bol reconcile sale"), ("On hold", ""))
-		self.assertEqual(self._status("_Test bol reconcile off"), ("Not for sale", "NL: Price too high (4000-1)"))
+		self.assertEqual(
+			self._status("_Test bol reconcile off"), ("Not for sale", "NL: Price too high (4000-1)")
+		)
 		gets = [path for method, path, _json, _params in self.bol.calls if method == "GET"]
 		# One list page and the reasons of the one offer that isn't for sale: no GET per offer.
 		self.assertEqual(gets, [PATH, f"{PATH}/{off_id}/not-for-sale-reasons"])
@@ -584,7 +612,9 @@ class TestReconcile(OfferSyncTestCase):
 		good_id = self._synced("_Test bol reconcile good", OTHER_EAN)
 		for offer_id in (bad_id, good_id):
 			self.bol.offers[offer_id]["countryAvailabilities"] = [{"countryCode": "NL", "forSale": False}]
-		self.bol.fail("GET", BolServerError("bol server error (HTTP 500)"), path=f"{PATH}/{bad_id}/not-for-sale-reasons")
+		self.bol.fail(
+			"GET", BolServerError("bol server error (HTTP 500)"), path=f"{PATH}/{bad_id}/not-for-sale-reasons"
+		)
 
 		offers.reconcile_offers()
 
@@ -621,7 +651,8 @@ class TestDeleteOffer(OfferSyncTestCase):
 		self.assertEqual(self.bol.writes(), [("DELETE", f"{PATH}/{offer_id}", None, None)])
 		self.assertEqual(self._mappings(), [])
 		self.assertEqual(
-			frappe.db.get_value("Item", "_Test bol delete", ["bol_enabled", "bol_offer_status"]), (0, "Deleted")
+			frappe.db.get_value("Item", "_Test bol delete", ["bol_enabled", "bol_offer_status"]),
+			(0, "Deleted"),
 		)
 		self.enqueued.reset_mock()
 		frappe.get_doc("Item", "_Test bol delete").save()
