@@ -10,6 +10,7 @@ from marketplace_integrations.bol.api.auth import invalidate_token
 from marketplace_integrations.bol.api.client import BolClient
 from marketplace_integrations.bol.api.errors import BolAuthError, BolError
 from marketplace_integrations.bol.log import log_call
+from marketplace_integrations.bol.mappers.bol_invoice import SETTLED_TYPES
 from marketplace_integrations.bol.offers import enqueue_adoption
 from marketplace_integrations.bol.permissions import check_bol_role
 
@@ -26,6 +27,8 @@ class BolSettings(Document):
 		self.validate_stock_sync()
 		self.validate_order_import()
 		self.validate_vvb()
+		self.validate_invoicing()
+		self.validate_invoice_import()
 		if not self.enabled:
 			return
 		missing = [_(self.meta.get_label(field)) for field in REQUIRED_WHEN_ENABLED if not self.get(field)]
@@ -102,6 +105,83 @@ class BolSettings(Document):
 		if self.use_vvb and not self.push_shipments:
 			frappe.throw(
 				_("Switch on Push Shipments before Use Verzenden via bol."), title=_("Missing Settings")
+			)
+
+	def validate_invoicing(self):
+		if self.upload_invoices and not self.auto_invoice:
+			frappe.throw(
+				_("Switch on Invoice Shipments and Returns before Upload Requested Invoices."),
+				title=_("Missing Settings"),
+			)
+		if not self.auto_invoice:
+			return
+		if not self.push_shipments:
+			# Shipments are invoiced once bol has confirmed them.
+			frappe.throw(
+				_("Switch on Push Shipments before Invoice Shipments and Returns."),
+				title=_("Missing Settings"),
+			)
+		if not self.receivable_account:
+			frappe.throw(
+				_("Set a Receivable Account before switching on Invoice Shipments and Returns."),
+				title=_("Missing Settings"),
+			)
+		if frappe.db.get_value("Account", self.receivable_account, "account_type") != "Receivable":
+			frappe.throw(_("Account {0} isn't a Receivable account.").format(self.receivable_account))
+		self.validate_account(self.receivable_account)
+
+	def validate_invoice_import(self):
+		if not self.import_bol_invoices:
+			return
+		missing = [
+			_(self.meta.get_label(field))
+			for field in ("supplier", "purchase_tax_template", "default_expense_account")
+			if not self.get(field)
+		]
+		if missing:
+			frappe.throw(
+				_("Set {0} before switching on Import bol Invoices.").format(", ".join(missing)),
+				title=_("Missing Settings"),
+			)
+		company = frappe.db.get_value(
+			"Purchase Taxes and Charges Template", self.purchase_tax_template, "company"
+		)
+		if self.company and company != self.company:
+			frappe.throw(
+				_("Tax template {0} belongs to company {1}, not {2}.").format(
+					self.purchase_tax_template, company, self.company
+				)
+			)
+		self.validate_account(self.default_expense_account)
+		seen = set()
+		for row in self.invoice_account_map:
+			# bol writes its line types in capitals.
+			row.bol_line_type = (row.bol_line_type or "").strip().upper()
+			if row.bol_line_type in SETTLED_TYPES:
+				frappe.throw(
+					_(
+						"Row {0}: {1} is never booked on a bol Purchase Invoice: it's the sales bol collected, which settle the bol receivable."
+					).format(row.idx, row.bol_line_type)
+				)
+			if row.bol_line_type in seen:
+				frappe.throw(
+					_("Row {0}: {1} is in the account map twice.").format(row.idx, row.bol_line_type)
+				)
+			seen.add(row.bol_line_type)
+			self.validate_account(row.expense_account)
+			if row.item and frappe.db.get_value("Item", row.item, "is_stock_item"):
+				# ERPNext books a stock item on Stock Received But Not Billed, not on the mapped account.
+				frappe.throw(
+					_("Row {0}: {1} is a stock item. Pick a non-stock item.").format(row.idx, row.item)
+				)
+
+	def validate_account(self, account: str):
+		company, is_group = frappe.db.get_value("Account", account, ["company", "is_group"]) or (None, None)
+		if is_group:
+			frappe.throw(_("Account {0} is a group account.").format(account))
+		if self.company and company != self.company:
+			frappe.throw(
+				_("Account {0} belongs to company {1}, not {2}.").format(account, company, self.company)
 			)
 
 	def validate_warehouse(self):

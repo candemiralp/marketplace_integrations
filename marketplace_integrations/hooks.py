@@ -175,6 +175,7 @@ doc_events = {
 		"onload": [
 			"marketplace_integrations.bol.labels.onload_delivery_note",
 			"marketplace_integrations.bol.returns.onload_delivery_note",
+			"marketplace_integrations.bol.invoices.onload_delivery_note",
 		],
 		"validate": [
 			"marketplace_integrations.bol.shipments.validate_delivery_note",
@@ -227,6 +228,9 @@ scheduler_events = {
 		"marketplace_integrations.bol.process_status.delete_old_processes",
 		"marketplace_integrations.bol.offers.reconcile_offers",
 		"marketplace_integrations.bol.cancellations.sync_recent_orders",
+		"marketplace_integrations.bol.invoices.sweep_sales_invoices",
+		"marketplace_integrations.bol.invoices.poll_bol_invoices",
+		"marketplace_integrations.bol.invoices.upload_requested_invoices",
 	],
 }
 

@@ -315,7 +315,33 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"no_copy": 1,
 		},
 	],
-	"Sales Invoice": _buyer_fields("po_date"),
+	# Sales Invoices and credit notes made for bol Delivery Notes (story 12). Set by hand: the DN's field isn't no_copy,
+	# but this one is, so a duplicated invoice doesn't claim the order.
+	"Sales Invoice": [
+		{
+			"fieldname": "bol_order_id",
+			"fieldtype": "Data",
+			"label": "bol Order ID",
+			"insert_after": "po_date",
+			"read_only": 1,
+			"no_copy": 1,
+			"in_standard_filter": 1,
+		},
+		*_buyer_fields("bol_order_id"),
+	],
+	# bol's own invoices, imported as draft Purchase Invoices (story 12). bol_invoice_id is the natural key.
+	"Purchase Invoice": [
+		{
+			"fieldname": "bol_invoice_id",
+			"fieldtype": "Data",
+			"label": "bol Invoice ID",
+			"insert_after": "bill_date",
+			"unique": 1,
+			"no_copy": 1,
+			"read_only": 1,
+			"in_standard_filter": 1,
+		},
+	],
 	# Per line: what shipments (08) and cancellations (10) refer to at bol.
 	"Sales Order Item": [
 		{

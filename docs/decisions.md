@@ -628,3 +628,70 @@ here, so a demo poll (run once on `dev.localhost`) made one "no submitted Delive
 ToDo (*Notify User* isn't set there). The demo's answer to the
 handling PUT wasn't checked (no writes were sent from this session). The flows are covered by tests against an
 in-memory fake.
+
+---
+
+## ADR-015 — Accounting: sales invoices, credit notes, bol invoices, invoice requests (story 12)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/retailer-api-v10.json` (Retailer API v10, Invoices and
+Shipments), bol's functional pages *Invoices* and *Customer invoices*, the demo pages `demo/v10-INVOICES.html` and
+`demo/v10-SHIPMENTS.html`, ERPNext 15.124.5 and the demo environment.
+
+| Story says | Spec / docs / ERPNext / demo say | Decision |
+|---|---|---|
+| `GET /retailer/invoices?period-start-date&period-end-date` (window ~31 days) | Confirmed; "no longer than 31 days" (the functional page says 32). **The spec has no response schema** (`string/byte`) for the list or the specification. The demo page has the shape: `invoiceListItems[{invoiceId, invoiceType (ALL_IN_ONE, ADVERTISING_VIA_BOL), issueDate, invoicePeriod, legalMonetaryTotal{lineExtensionAmount, payableAmount, taxExclusiveAmount, taxInclusiveAmount: {amount, currencyID}}, invoiceMediaTypes, specificationMediaTypes}]` | Periods of ≤ 31 days that share their boundary day (whether bol's end date is inclusive or not, no day is missed; invoices are de-duplicated by id). bol's totals = `taxExclusiveAmount` (net) and `taxInclusiveAmount − taxExclusiveAmount` (VAT). A 404 on the list (not in the spec) counts as "no invoices". |
+| `GET …/{id}/specification` → line details | Paged with `page`, no schema. Demo: `invoiceSpecification[{id, invoiceLineRef, invoicedQuantity, item{Name = type, Description[], AdditionalItemProperty[]}, lineExtensionAmount{value}, price, taxTotal{TaxAmount{value}}}]` | Read until an empty page; a 404 past page 1, or a page identical to the previous one, ends it. Summed per `item.Name` (the line type), rounded per type in the currency precision. |
+| `GET …/{id}` with Accept PDF | Confirmed (`application/vnd.retailer.v10+pdf`); the list says which media types each invoice has | The PDF is fetched only when listed; otherwise the remarks say so. Checked for `%PDF-` before Frappe's PDF check (as for labels, ADR-012). |
+| Group lines by type, map to accounts | An ALL_IN_ONE invoice nets **`TURNOVER`** (the sales bol collected from buyers, VAT category O) against the fees, so `payableAmount` is usually negative | **Owner decision: TURNOVER and CORRECTION_TURNOVER stay off the Purchase Invoice.** Our Sales Invoices booked those sales on the bol receivable already; a PI line can't post to a Receivable account anyway (ERPNext needs a party on it). The remarks give their total; the account map refuses them. |
+| Total check: our net/VAT vs the invoice | — | The draft's `net_total` / `total_taxes_and_charges` (as ERPNext computes them with the purchase template) are compared with bol's totals **minus the turnover**. More than 0.01 off → `MISMATCH: …` first in the remarks, `log_once("bol_invoice_mismatch", id)`. Never corrected. |
+| Negative total → debit note; "if ERPNext requires `return_against`, log it" | ERPNext 15's `validate_return` checks `return_against` only when it's set: **a PI debit note doesn't need it** | Negative totals become draft PIs with `is_return = 1`, no `return_against`. A non-return PI refuses a negative qty but takes a negative rate: lines are qty 1 (−1 on a debit note) with a signed rate, so a type of the other sign still books correctly. |
+| Lines without an item | A PI line needs `item_name`, `uom`, `conversion_factor` | `item_name` = the line type, description = bol's Dutch text + line count, uom = *Stock Settings → Default UOM*. A mapped item must be non-stock (ERPNext would book a stock item on Stock Received But Not Billed). |
+| `make_sales_invoice(return_dn)` → credit note against the original SI | ERPNext's Delivery Note mapper maps `is_return` but **not `return_against`**, and leaves out no_copy fields | `return_against` = the submitted SI of the original Delivery Note, each row's `sales_invoice_item` found through the return row's `dn_detail`; `bol_order_id` and `debit_to` are set by hand. No original SI yet → `BolMappingError`, retried by the sweep. |
+| (D) `GET /retailer/shipments/invoices/requests`, upload `POST /retailer/shipments/invoices/{shipment-id}` | Confirmed: requests `state` ∈ OPEN, UPLOAD_ERROR, ALL (the spec writes the enum as **one comma-joined string**, a spec bug), 50 per page; upload is `multipart/form-data`, field **`invoice`** → 202 `UPLOAD_INVOICE`. *Customer invoices* page: PDF only, ≤ 2 MB, KvK/VAT number of business buyers must be on it, one upload per shipment, re-upload after a virus result (UPLOAD_ERROR) | Implemented (owner decision). Requests in OPEN and UPLOAD_ERROR are uploaded. `BolClient.request(files=…)` sends multipart (requests sets the boundary; the log records file name and size only). |
+
+**Decisions.**
+- **A. Sales Invoices.** `shipments._confirmed` (both the success handler and the "bol already has it" path) and
+  `returns._reported` call `invoices` (module imports both ways; attributes are only used at call time), which queues
+  `invoice_delivery_note` (`job_id=bol_invoice::{dn}`, deduplicated, after commit) when *Invoice Shipments and
+  Returns* is on. Posting date/time = the Delivery Note's ("the shipment date" in our books; bol's own
+  `shipmentDateTime` would cost a GET). Credit notes are dated today (they must not predate the invoice).
+- **Idempotency.** A Delivery Note counts as invoiced when **any Sales Invoice that isn't cancelled** references it
+  (`Sales Invoice Item.delivery_note`), a draft made by hand included: someone is invoicing it, and a second invoice
+  would bill the buyer twice. The story says "submitted SI"; this is stricter. The DN row is locked first.
+- **Failures** roll back to a savepoint, `log_once("sales_invoice", dn)` and comment once on the DN. The form shows
+  **Create bol Sales Invoice / credit note** while one is due and missing (`__onload.bol_invoice_missing`); it needs
+  Bol Manager/System Manager **and** Sales Invoice create permission (plus DN read).
+- **Sweep** (daily): Delivery Notes of the last 30 days that are due and have **no Sales Invoice at all** are queued.
+  One with a cancelled invoice is left alone (cancelled on purpose). Shipments are queued before returns.
+- **C. Window.** `bol_invoices_until` (read-only) = today after a run where every invoice imported. While any invoice
+  fails, it **stays where it was**, so the 7-day overlap keeps covering the failed one until it imports (a failure is
+  never dropped after a week). The first run starts 30 days back. A list failure is logged once per 6 h and raised.
+- **One savepoint and commit per bol invoice**; a unique-key race (`bol_invoice_id`) counts as done. PIs are never
+  submitted. Posting date = bill date = bol's issue date (the VAT period it belongs to); the reviewer can change it.
+- **Dates.** bol's demo sends `issueDate` as epoch **seconds** and `invoicePeriod` as epoch **milliseconds**;
+  `mappers/bol_invoice.issue_date` also takes ISO dates and timestamps, in the system time zone.
+- **D. Uploads** (daily, *Upload Requested Invoices*, needs *Invoice Shipments and Returns*): shipment → DN
+  (`bol_shipment_id`) → its submitted non-return SI → `frappe.get_print(…, "bol Sales Invoice", as_pdf=True)` →
+  multipart POST → Bol Process `invoice_upload` (new option of Bol Process' *handler*) on the SI. Skipped while that
+  process is unfinished. An ambiguous POST isn't repeated blindly: the next run sees whether bol still lists the
+  request (bol refuses a second upload with a 400). No DN/SI → `log_once("invoice_request", shipment)` (+ DN comment).
+  The buyer's billing details from the request aren't stored or logged (PII).
+- **Print format "bol Sales Invoice"** (owner decision; standard, module Bol): the bol buyer (company, name, address,
+  VAT and KvK numbers) is the invoice party, not the *bol.com* customer. Labels are **Dutch text**, not `_()`: bol
+  requires the language of the buyer's country (NL, BE) whatever the system language. Prices are shown incl. VAT
+  (bol's prices), with net, VAT rows and total.
+- **PDF rendering** (wkhtmltopdf) fetches the print styles from the site's URL, so the background workers must be able
+  to reach it (`host_name`), as for any Frappe PDF. In this dev container `test.localhost` doesn't resolve, so the
+  tests render the print format as HTML and mock the PDF step.
+- **Still open for the accountant:** VAT treatment of business buyers in BE (reverse charge vs OSS) — no VAT logic
+  was changed; the order import's templates apply. Also whether credit notes should reduce the original invoice's
+  outstanding (ERPNext default) or stand on their own.
+
+**Demo environment (checked live, `dev.localhost`, GETs only).** The invoice list answers **only without a period**
+(with `period-start-date`/`period-end-date` it's a 404) and returns one canned invoice (`4500022543921`, ALL_IN_ONE,
+issue date 2018-05-01). The specification answers **only without `page`** (404 with one). The "PDF" is 141 bytes of
+text ("THIS IS A FAKE PDF FILE …"), so an import on the demo ends in an error log, and its three documents' totals
+don't agree with each other anyway. In Demo the list is read without a period and the specification once. Invoice
+requests: `state=OPEN` answers two canned requests (shipments `987654`, `665578`, unknown here → logged);
+`state=UPLOAD_ERROR` is a 400, so Demo reads OPEN only. No upload was sent from here. The flows are covered by tests
+against an in-memory fake of the endpoints.

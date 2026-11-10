@@ -234,7 +234,9 @@ class ReturnTestCase(FrappeTestCase):
 		return getattr(frappe.local, "bol_pending_logs", None) or []
 
 	def _make_old(self, name: str, minutes: int = returns.SWEEP_AFTER_MINUTES + 1):
-		frappe.db.set_value(DN, name, "modified", add_to_date(now_datetime(), minutes=-minutes), update_modified=False)
+		frappe.db.set_value(
+			DN, name, "modified", add_to_date(now_datetime(), minutes=-minutes), update_modified=False
+		)
 
 
 class TestImport(ReturnTestCase):
@@ -247,14 +249,18 @@ class TestImport(ReturnTestCase):
 		(ret,) = self._returns(item["rmaId"])
 		self.assertEqual((ret.docstatus, ret.is_return, ret.return_against), (0, 1, dn.name))
 		shirt = next(row for row in dn.items if row.item_code == SHIRT)
-		self.assertEqual([(row.item_code, row.qty, row.dn_detail) for row in ret.items], [(SHIRT, -1, shirt.name)])
+		self.assertEqual(
+			[(row.item_code, row.qty, row.dn_detail) for row in ret.items], [(SHIRT, -1, shirt.name)]
+		)
 		self.assertEqual(ret.items[0].stock_qty, -1)
 		self.assertEqual(
 			(ret.bol_return_id, ret.bol_expected_qty, ret.bol_return_status, ret.bol_return_reason),
 			(self.bol.return_id(item["rmaId"]), 1, "Open", "Verkeerde maat of formaat: Te klein"),
 		)
 		(todo,) = self._todos(item["rmaId"])
-		self.assertEqual((todo.allocated_to, todo.reference_type, todo.reference_name), ("Administrator", DN, ret.name))
+		self.assertEqual(
+			(todo.allocated_to, todo.reference_type, todo.reference_name), ("Administrator", DN, ret.name)
+		)
 		self.assertIn("inspect and submit", todo.description)
 		# No financial documents (story 12), and bol is told nothing yet.
 		self.assertEqual(self.bol.puts(), [])
@@ -335,7 +341,9 @@ class TestImport(ReturnTestCase):
 	def test_created_concurrently_is_already_done(self):
 		order_id, _dn = self._shipped_order()
 		self.bol.add(order_id)
-		error = frappe.UniqueValidationError(DN, "MAT-DN-1", Exception("Duplicate entry for key 'bol_rma_id'"))
+		error = frappe.UniqueValidationError(
+			DN, "MAT-DN-1", Exception("Duplicate entry for key 'bol_rma_id'")
+		)
 
 		with patch.object(returns, "create_return", side_effect=error):
 			returns.poll_returns()
@@ -468,7 +476,8 @@ class TestReport(ReturnTestCase):
 		self.assertEqual(self._status(ret.name), "Open")
 		self.assertTrue(
 			frappe.db.exists(
-				process_status.DOCTYPE, {"reference_name": ret.name, "handler": returns.HANDLER, "status": "PENDING"}
+				process_status.DOCTYPE,
+				{"reference_name": ret.name, "handler": returns.HANDLER, "status": "PENDING"},
 			)
 		)
 
@@ -650,7 +659,12 @@ class TestWithoutStockReturn(ReturnTestCase):
 		# bol's spec: quantityReturned is at least 1 (ADR-014).
 		self.assertEqual(
 			self.bol.puts(),
-			[(f"{returns.PATH}/{rma_id}", {"handlingResult": "CUSTOMER_KEEPS_PRODUCT_PAID", "quantityReturned": 2})],
+			[
+				(
+					f"{returns.PATH}/{rma_id}",
+					{"handlingResult": "CUSTOMER_KEEPS_PRODUCT_PAID", "quantityReturned": 2},
+				)
+			],
 		)
 		self.assertFalse(frappe.db.exists(DN, ret.name))
 		self.assertEqual(self._todos(rma_id), [])
@@ -669,7 +683,9 @@ class TestWithoutStockReturn(ReturnTestCase):
 		self.assertEqual(self._returns(rma_id), [])
 
 		self._finish()
-		self.assertIn(f"bol processed return {rma_id}: CUSTOMER_KEEPS_PRODUCT_PAID", self._comments(dn.name)[-1])
+		self.assertIn(
+			f"bol processed return {rma_id}: CUSTOMER_KEEPS_PRODUCT_PAID", self._comments(dn.name)[-1]
+		)
 		returns.poll_returns()
 		self.assertEqual(self._returns(rma_id), [])
 

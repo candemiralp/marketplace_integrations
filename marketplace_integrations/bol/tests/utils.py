@@ -242,3 +242,67 @@ def make_tax_template(title: str, account: str, included: int = 1, company: str 
 			],
 		}
 	).insert()
+
+
+# Accounting masters (story 12), in the caller's transaction.
+TEST_SUPPLIER = "_Test bol.com Supplier"
+TEST_RECEIVABLE = f"_Test Debtors bol - {TEST_COMPANY_ABBR}"
+TEST_PURCHASE_TEMPLATE = f"_Test bol Input VAT - {TEST_COMPANY_ABBR}"
+COMMISSION_ACCOUNT = f"Commission on Sales - {TEST_COMPANY_ABBR}"
+MISC_EXPENSE_ACCOUNT = f"Miscellaneous Expenses - {TEST_COMPANY_ABBR}"
+
+
+def make_accounting_masters() -> frappe._dict:
+	"""The bol receivable, the bol.com supplier and a 21% purchase VAT template. Needs make_order_masters first."""
+	for party_type, account_type in (("Customer", "Receivable"), ("Supplier", "Payable")):
+		# Invoices post to a party; the setup wizard normally creates these.
+		if not frappe.db.exists("Party Type", party_type):
+			frappe.get_doc(
+				{"doctype": "Party Type", "party_type": party_type, "account_type": account_type}
+			).insert()
+	if not frappe.db.exists("Account", TEST_RECEIVABLE):
+		frappe.get_doc(
+			{
+				"doctype": "Account",
+				"account_name": "_Test Debtors bol",
+				"company": TEST_COMPANY,
+				"parent_account": frappe.db.get_value(
+					"Account", f"Debtors - {TEST_COMPANY_ABBR}", "parent_account"
+				),
+				"account_type": "Receivable",
+			}
+		).insert()
+	if not frappe.db.exists("Supplier Group", "All Supplier Groups"):
+		frappe.get_doc(
+			{"doctype": "Supplier Group", "supplier_group_name": "All Supplier Groups", "is_group": 1}
+		).insert()
+	if not frappe.db.exists("Supplier", TEST_SUPPLIER):
+		frappe.get_doc(
+			{"doctype": "Supplier", "supplier_name": TEST_SUPPLIER, "supplier_group": "All Supplier Groups"}
+		).insert()
+	if not frappe.db.exists("Purchase Taxes and Charges Template", TEST_PURCHASE_TEMPLATE):
+		frappe.get_doc(
+			{
+				"doctype": "Purchase Taxes and Charges Template",
+				"title": "_Test bol Input VAT",
+				"company": TEST_COMPANY,
+				"taxes": [
+					{
+						"charge_type": "On Net Total",
+						# The VAT account _make_company created.
+						"account_head": f"_Test bol VAT NL - {TEST_COMPANY_ABBR}",
+						"description": "BTW 21%",
+						"rate": 21,
+						"category": "Total",
+						"add_deduct_tax": "Add",
+					}
+				],
+			}
+		).insert()
+	return frappe._dict(
+		receivable_account=TEST_RECEIVABLE,
+		supplier=TEST_SUPPLIER,
+		purchase_tax_template=TEST_PURCHASE_TEMPLATE,
+		commission_account=COMMISSION_ACCOUNT,
+		default_expense_account=MISC_EXPENSE_ACCOUNT,
+	)

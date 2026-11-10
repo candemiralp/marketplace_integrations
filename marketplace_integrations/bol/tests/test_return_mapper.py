@@ -47,15 +47,24 @@ class TestUnhandledItems(unittest.TestCase):
 
 class TestReasonText(unittest.TestCase):
 	def test_all_parts(self):
-		reason = {"mainReason": "Verkeerde maat", "detailedReason": "Te klein", "customerComments": "Valt klein"}
+		reason = {
+			"mainReason": "Verkeerde maat",
+			"detailedReason": "Te klein",
+			"customerComments": "Valt klein",
+		}
 		self.assertEqual(reason_text(reason), "Verkeerde maat — Te klein: Valt klein")
 
 	def test_comment_repeating_the_reason_is_left_out(self):
-		reason = {"mainReason": "Verkeerd artikel ontvangen", "customerComments": "Verkeerd artikel ontvangen"}
+		reason = {
+			"mainReason": "Verkeerd artikel ontvangen",
+			"customerComments": "Verkeerd artikel ontvangen",
+		}
 		self.assertEqual(reason_text(reason), "Verkeerd artikel ontvangen")
 
 	def test_empty_parts(self):
-		self.assertEqual(reason_text({"mainReason": "Anders", "detailedReason": None, "customerComments": ""}), "Anders")
+		self.assertEqual(
+			reason_text({"mainReason": "Anders", "detailedReason": None, "customerComments": ""}), "Anders"
+		)
 		self.assertEqual(reason_text(None), "")
 
 	def test_long_text_is_truncated(self):
@@ -87,7 +96,9 @@ class TestBodyAndState(unittest.TestCase):
 		)
 
 	def test_handling_results_match_the_spec(self):
-		spec = json.loads((FIXTURES.parent.parent.parent.parent / "docs/bol-openapi/retailer-api-v10.json").read_text())
+		spec = json.loads(
+			(FIXTURES.parent.parent.parent.parent / "docs/bol-openapi/retailer-api-v10.json").read_text()
+		)
 		enum = spec["components"]["schemas"]["ReturnRequest"]["properties"]["handlingResult"]["enum"]
 		self.assertEqual(list(HANDLING_RESULTS), enum)
 

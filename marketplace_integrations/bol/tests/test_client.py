@@ -280,6 +280,26 @@ class TestBolClient(FrappeTestCase):
 		self.assertEqual(result, pdf)
 		self.assertEqual(session.calls[0]["headers"]["Accept"], "application/vnd.retailer.v10+pdf")
 
+	def test_files_are_sent_as_multipart_and_logged_by_size(self):
+		pdf = b"%PDF-1.4 invoice"
+		bol, session = self._client(make_response(202, {"processStatusId": "1"}))
+
+		bol.request(
+			"POST",
+			"/retailer/shipments/invoices/987654",
+			version=10,
+			files={"invoice": ("SINV-1.pdf", pdf, "application/pdf")},
+		)
+
+		call = session.calls[0]
+		self.assertEqual(call["files"], {"invoice": ("SINV-1.pdf", pdf, "application/pdf")})
+		self.assertIsNone(call["json"])
+		# requests sets multipart/form-data with its boundary.
+		self.assertNotIn("Content-Type", call["headers"])
+		logged = self.log_call.call_args.kwargs["request"]
+		self.assertEqual(logged["files"], {"invoice": f"SINV-1.pdf <{len(pdf)} bytes>"})
+		self.assertNotIn(pdf.decode(), str(logged))
+
 	def test_unparseable_json_is_server_error(self):
 		bol, _ = self._client(*[make_response(200, content=b"<html>oops</html>") for _ in range(4)])
 

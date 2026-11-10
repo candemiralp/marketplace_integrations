@@ -1,0 +1,70 @@
+{
+  "invoiceRequests": [
+    {
+      "shipmentId": "987654",
+      "orderId": "4691862037",
+      "customerAccountNumber": "3004850316",
+      "billingDetails": {
+        "salutation": "MALE",
+        "firstName": "Billie",
+        "surname": "Jansen",
+        "streetName": "Dorpstraat",
+        "houseNumber": "1",
+        "houseNumberExtension": "B",
+        "zipCode": "1111ZZ",
+        "city": "Utrecht",
+        "countryCode": "NL",
+        "company": "bol.com",
+        "vatNumber": "NL999999999B99",
+        "kvkNumber": "99887766"
+      },
+      "products": [
+        {
+          "description": "Eucerin Hyaluron-filler",
+          "quantity": 2,
+          "unitPrice": 10.0
+        }
+      ],
+      "status": "INVOICE_REQUESTED",
+      "statusTransitions": [
+        {
+          "status": "INVOICE_REQUESTED",
+          "statusDateTime": "2020-12-09T12:34:56+01:00"
+        }
+      ]
+    },
+    {
+      "shipmentId": "665578",
+      "orderId": "564734839",
+      "customerAccountNumber": "5664838354",
+      "billingDetails": {
+        "salutation": "MALE",
+        "firstName": "Jon",
+        "surname": "Groot",
+        "streetName": "Dorpstraat",
+        "houseNumber": "1",
+        "houseNumberExtension": "B",
+        "zipCode": "2222ZZ",
+        "city": "Utrecht",
+        "countryCode": "NL",
+        "company": "bol.com",
+        "vatNumber": "NL999999999B99",
+        "kvkNumber": "99887766"
+      },
+      "products": [
+        {
+          "description": "Boxer Live In Brussels",
+          "quantity": 1,
+          "unitPrice": 10.0
+        }
+      ],
+      "status": "INVOICE_REQUESTED",
+      "statusTransitions": [
+        {
+          "status": "INVOICE_REQUESTED",
+          "statusDateTime": "2020-12-09T11:34:56+01:00"
+        }
+      ]
+    }
+  ]
+}
