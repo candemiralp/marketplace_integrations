@@ -3,7 +3,10 @@
 
 frappe.ui.form.on("Bol Process", {
 	refresh(frm) {
-		if (frm.doc.status !== "HANDLER_ERROR" || !frappe.user.has_role(["System Manager", "Bol Manager"])) {
+		if (
+			frm.doc.status !== "HANDLER_ERROR" ||
+			!frappe.user.has_role(["System Manager", "Bol Manager"])
+		) {
 			return;
 		}
 		frm.add_custom_button(__("Retry handler"), () => {

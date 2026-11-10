@@ -11,7 +11,10 @@
   "credentials_column",
   "client_id",
   "client_secret",
-  "company"
+  "company",
+  "offers_section",
+  "default_min_days",
+  "default_max_days"
  ],
  "fields": [
   {
@@ -57,13 +60,30 @@
    "label": "Company",
    "mandatory_depends_on": "eval:doc.enabled",
    "options": "Company"
+  },
+  {
+   "fieldname": "offers_section",
+   "fieldtype": "Section Break",
+   "label": "Offers"
+  },
+  {
+   "description": "Delivery promise for items that don't set their own (bol Min Days on the Item).",
+   "fieldname": "default_min_days",
+   "fieldtype": "Int",
+   "label": "Default Min Days to Customer"
+  },
+  {
+   "description": "Delivery promise for items that don't set their own (bol Max Days on the Item).",
+   "fieldname": "default_max_days",
+   "fieldtype": "Int",
+   "label": "Default Max Days to Customer"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 14:41:42.147506",
+ "modified": "2026-11-10 15:53:34.259542",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",

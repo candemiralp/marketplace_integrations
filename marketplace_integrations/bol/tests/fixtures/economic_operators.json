@@ -1,0 +1,20 @@
+{
+	"operators": [
+		{
+			"id": "0c6573a2-a80c-48b7-a03e-d5939f1173fa",
+			"externalReference": "external-reference",
+			"name": "Magnatlas B.V.",
+			"address": {"street": "Hoofdstraat", "houseNumber": "1", "postalCode": "1234AB", "city": "Utrecht", "country": "NL"},
+			"contactInformation": {"emailAddress": "eo@example.com", "phoneNumber": "+31301234567"},
+			"status": "VALID"
+		},
+		{
+			"id": "5d6e7f80-a80c-48b7-a03e-d5939f1173fb",
+			"name": "Atelier Import",
+			"address": {"street": "Kerkstraat", "houseNumber": "2", "postalCode": "2000", "city": "Antwerpen", "country": "BE"},
+			"contactInformation": {"emailAddress": "import@example.com", "phoneNumber": "+3231234567"},
+			"status": "PENDING"
+		}
+	],
+	"page": {"pageNumber": 1, "pageSize": 100, "numberOfPages": 1, "totalCount": 2}
+}

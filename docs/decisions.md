@@ -207,3 +207,61 @@ failure inside the client would also defeat `log_once` (rule 6).
   early while `Bol Settings.enabled` is off.
 - Comment helper `log.add_comment(reference, text)` for all stories. It does nothing if the document
   no longer exists.
+
+---
+
+## ADR-007 — Catalog mapping, economic operators, adopting offers (story 04)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/offers-v11.yaml` (Offers API 11.5.0) and
+`docs/bol-openapi/economic-operators-v1.yaml` (Economic Operator API 1.1.1), both from
+`https://api.bol.com/registry/api-definitions/…`, and against ERPNext 15.124.5.
+
+| Story says | Spec / ERPNext says | Decision |
+|---|---|---|
+| Economic operators: list and get one | List is **`GET /retailer/economic-operators`** (`name`, `page`, `page-size` 25–100) → `{operators[], page{pageNumber, pageSize, numberOfPages, totalCount}}`. Get one is **`GET /retailer/economic-operator/{id}`** (singular) | Page through the list until `pageNumber >= numberOfPages`. The spec lists 404 for the list: treated as "no operators". |
+| Fields `economicOperatorId`, `name`, `status` | The operator's id field is **`id`** (string UUID). `status` ∈ `PENDING, VALID, INVALID` | Return `{id, name, status}`. |
+| — | Media type `application/vnd.economic-operator.v1+json` (ADR-004) | Passed as `accept`. |
+| Offers v11 list filters `eans, reference, for-sale, page-size, cursor` | Also `offer-ids`, `last-modified-date-time`. `page-size` 1–100. Response `{offers[], page{pageSize, nextCursor}}` | Follow `page.nextCursor` until it's null or empty. |
+| `bol_offer_status` "For sale / Not for sale / On hold" | v11 offers have **no status field**: only `onHoldByRetailer` and `countryAvailabilities[{countryCode, forSale}]` | `mappers/offer.offer_status`: on hold → `On hold`; for sale in any country → `For sale`; else `Not for sale`. |
+| `bol_status_detail` = not-for-sale reasons | Reasons come from a separate `GET /retailer/offers/{id}/not-for-sale-reasons` | Adopting doesn't fetch them (one call per offer). Story 05 fills the detail when it refreshes the status. |
+| Item `bol_min_days`/`bol_max_days`: blank = Settings default | Int custom fields are `NOT NULL DEFAULT 0` | **0 means "use the Settings default"**. A promise of 0 days can still be set in Bol Settings. |
+| Duplicate EAN across Items | ERPNext's `Item Barcode.barcode` is **unique**, so the same string can't be on two Items | A "duplicate" is the same GTIN written differently: UPC-A (12 digits), EAN-13, GTIN-14 (GS1 treats leading zeros as insignificant). Lookup matches all zero-padded forms (`mappers/ean.gtin_forms`); more than one Item → reported as ambiguous. This also matches UPC-A barcodes from Shopify. |
+| `frappe.only_for([...])` | `only_for` lets everyone through when `frappe.flags.in_test` is set (ADR-006) | `bol/permissions.check_bol_role()` checks `frappe.get_roles()`. Bol Process' Retry handler uses it too. |
+| — | The offers spec has no response `example` for the list | Test fixtures are built from the schema's field examples. |
+
+**Decisions.**
+- **Item validation** (`catalog.validate_item`, Item `validate` hook) runs on every save while
+  `bol_enabled` is ticked, not only when it's ticked. It lists every problem at once. Adopted items
+  that aren't publishable yet (no operator on the Brand, a UPC-A barcode) can't be saved until they're
+  fixed or unticked. That's deliberate: story 05 can't publish them either.
+- `get_item_ean` is pure, so it can't translate. `BolMappingError` gets a `reason` code
+  (`missing | several | invalid`) and the hook shows its own translated message for each.
+- **Brand operator**: `bol_economic_operator_id` is read-only and set only through
+  `set_brand_economic_operator`. It checks the id at bol (`GET` one operator) and rejects anything
+  that isn't UUID-like before it reaches the URL path. It saves the Brand as a document
+  (`save(ignore_permissions=True)`), so Brand hooks (story 05) see the change, and a Bol Manager
+  without Brand write permission can set just this field. Brand read permission is still required.
+  An operator that isn't `VALID` is saved and the form shows a warning.
+- **Adopt existing offers** (`offers.adopt_existing_offers`), a long job, one at a time
+  (`job_id="bol_adopt_existing_offers"`). With `enqueue_after_commit=True`, `frappe.enqueue` always
+  returns `None`, so "already running" is checked with `is_job_enqueued` first.
+  - It only sends GETs to bol. Each offer is processed inside a savepoint and committed on its own.
+  - Upsert keyed on the offerId. An offer already mapped to another Item, or an Item/EAN already mapped
+    to another offer, is a **conflict**: reported and left unchanged. `DuplicateEntryError` on insert
+    counts as already mapped (ADR-001: Ecommerce Item has no DB unique constraint).
+  - `bol_enabled` and `bol_offer_status` are written with `frappe.db.set_value(update_modified=False)`.
+    That skips Item validation and doc_events on purpose, so adopting never triggers an offer push.
+  - The result is **one** integration log entry (Success, or Error if paging failed) whose response
+    holds the counts and the lists of unmatched, ambiguous, conflicting and failed offers. On a paging
+    error it also holds the pages done, the last cursor and bol's response, and the job then fails. An
+    offer that raises is rolled back, gets its own Error log and is counted as failed. The user who
+    started the job gets a realtime `msgprint`.
+  - `log_call` gained an optional `message` to replace its default one-line summary.
+- `Brand.bol_economic_operator_id`, `Item.bol_offer_status`/`bol_status_detail`/`bol_enabled` and
+  `Ecommerce Item.bol_last_stock_pushed` are `no_copy`. A duplicated Item must not inherit bol state.
+- **Checked live on the demo environment** (read-only GETs): both list paths, the EO media type and
+  the offer fields above are as the spec says. The demo ignores `page-size` (it always answers 25).
+  It also returns the **same `nextCursor` on every page** and the same operator on all 4 "pages".
+  So the adopt job stops with an Error log when bol repeats the cursor it was just given (following
+  it would loop forever, and stopping without an error could hide offers). Operators are de-duplicated
+  by `id`. On the demo, adopting therefore ends after page 2 with that error.

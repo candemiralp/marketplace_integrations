@@ -15,5 +15,28 @@ frappe.ui.form.on("Bol Settings", {
 				}
 			});
 		});
+
+		if (frm.doc.enabled && !frm.is_dirty()) {
+			frm.add_custom_button(__("Adopt existing offers"), () => adopt_existing_offers(frm));
+		}
 	},
 });
+
+function adopt_existing_offers(frm) {
+	frappe.confirm(
+		__(
+			"Map every offer that already exists at bol to its Item by EAN? Nothing is created or changed at bol. You get a message with the result when it's done."
+		),
+		() => {
+			frm.call({ method: "adopt_existing_offers", doc: frm.doc }).then((r) => {
+				const queued = r.message && r.message.queued;
+				frappe.show_alert({
+					message: queued
+						? __("Adopting bol offers in the background")
+						: __("Adopting bol offers is already running"),
+					indicator: queued ? "blue" : "orange",
+				});
+			});
+		}
+	);
+}

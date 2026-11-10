@@ -54,4 +54,12 @@ class BolServerError(BolError):
 
 
 class BolMappingError(BolError):
-	"""Our data can't be mapped to bol (unknown EAN, missing price, …). Not retryable."""
+	"""Our data can't be mapped to bol (unknown EAN, missing price, …). Not retryable.
+
+	`reason` is a short code for the case, so a caller can show its own translated message
+	(mappers are pure and can't translate).
+	"""
+
+	def __init__(self, message: str, details: dict | None = None, *, reason: str | None = None):
+		super().__init__(message, details)
+		self.reason = reason

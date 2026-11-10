@@ -62,3 +62,58 @@ class FakeSession:
 		if isinstance(result, Exception):
 			raise result
 		return result
+
+
+def discard_pending_logs():
+	"""Drop the logs bol/log.py queued in this test's transaction (they would be flushed on rollback)."""
+	frappe.local.bol_pending_logs = None
+
+
+# Catalog records. The test site has no ERPNext masters (no setup wizard), so tests create them.
+TEST_UOM = "_Test bol UOM"
+TEST_ITEM_GROUP = "_Test bol Item Group"
+TEST_BRAND = "_Test bol Brand"
+OPERATOR_ID = "0c6573a2-a80c-48b7-a03e-d5939f1173fa"
+
+
+def make_catalog_masters():
+	"""UOM, Item Group and a Brand with an economic operator, in the caller's transaction."""
+	if not frappe.db.exists("UOM", TEST_UOM):
+		frappe.get_doc({"doctype": "UOM", "uom_name": TEST_UOM}).insert()
+	if not frappe.db.exists("Item Group", TEST_ITEM_GROUP):
+		root = frappe.db.get_value("Item Group", {"is_group": 1, "parent_item_group": ("in", ("", None))})
+		frappe.get_doc(
+			{"doctype": "Item Group", "item_group_name": TEST_ITEM_GROUP, "parent_item_group": root}
+		).insert()
+	make_brand(TEST_BRAND, OPERATOR_ID)
+
+
+def make_brand(name: str, operator_id: str | None = None):
+	if frappe.db.exists("Brand", name):
+		frappe.db.set_value("Brand", name, "bol_economic_operator_id", operator_id)
+		return frappe.get_doc("Brand", name)
+	return frappe.get_doc(
+		{"doctype": "Brand", "brand": name, "bol_economic_operator_id": operator_id}
+	).insert()
+
+
+def make_item(item_code: str, *barcodes, **values):
+	"""An Item; each barcode is a code (type EAN) or a (code, barcode_type) tuple."""
+	rows = [
+		{"barcode": b, "barcode_type": "EAN"}
+		if isinstance(b, str)
+		else dict(zip(("barcode", "barcode_type"), b, strict=True))
+		for b in barcodes
+	]
+	return frappe.get_doc(
+		{
+			"doctype": "Item",
+			"item_code": item_code,
+			"item_group": TEST_ITEM_GROUP,
+			"stock_uom": TEST_UOM,
+			"is_stock_item": 1,
+			"brand": TEST_BRAND,
+			"barcodes": rows,
+			**values,
+		}
+	).insert()

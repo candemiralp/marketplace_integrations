@@ -44,6 +44,7 @@ required_apps = ["erpnext", "ecommerce_integrations"]
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Brand": "public/js/brand.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -154,6 +155,10 @@ after_migrate = "marketplace_integrations.install.after_migrate"
 # Document Events
 # ---------------
 # Hook on document methods and events
+
+doc_events = {
+	"Item": {"validate": "marketplace_integrations.bol.catalog.validate_item"},
+}
 
 # doc_events = {
 # 	"*": {

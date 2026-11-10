@@ -64,6 +64,39 @@ until bol reports a final state:
 Polling only runs while *Enabled* is ticked in Bol Settings. Final rows are deleted after 90 days;
 `HANDLER_ERROR` rows are kept until someone retries them.
 
+**Catalog: which Items are sold on bol** (ADR-007)
+
+1. **Economic operator per Brand.** Create the operators in the bol seller dashboard. On each Brand,
+   click **Select bol economic operator** (System Manager / Bol Manager) and pick one. If bol hasn't
+   marked the operator `VALID` yet, it's saved anyway, but offers linked to it won't be published.
+2. **Delivery promise.** Set *Default Min/Max Days to Customer* in Bol Settings. An Item can override
+   them in its *bol.com* section (Sales tab); 0 means "use the default".
+3. **Mark Items.** Tick **Sell on bol** on the Item. It saves only when the Item is a stock item (not a
+   template), has exactly one barcode of type *EAN* with a valid 13-digit GTIN, and its Brand has an
+   economic operator. The message lists everything that's missing. While the box is ticked, these
+   checks run on every save.
+4. *bol Offer Status* (`For sale`, `Not for sale`, `On hold`) and *bol Status Detail* are read-only.
+   bol writes them.
+
+**Adopt existing offers** (one-off, at cutover). Offers that already exist at bol (created by the old
+Shopify↔bol app) are linked to their Items, never created again.
+
+1. Enable the integration, save, and click **Adopt existing offers** in Bol Settings. It runs in the
+   background and only reads from bol.
+2. Each offer is matched to an Item through its EAN in the Item's barcodes. UPC-A (12 digits) and
+   GTIN-14 forms of the same number match too. A match is stored as an *Ecommerce Item* (integration
+   *Bol*, *Integration Item Code* = offer ID, *SKU* = EAN). The Item gets *Sell on bol* ticked and
+   the offer's status copied, without the checks from step 3 above: fix what's missing later.
+3. When it's done you get a message with the counts. The full report is the newest *Ecommerce
+   Integration Log* entry with method `adopt_existing_offers`:
+   - **unmatched**: no Item has this EAN. Add the barcode to the right Item, or delete the offer at bol.
+   - **ambiguous**: several Items have this EAN. Remove the duplicate barcode.
+   - **conflict**: the offer is already linked to another Item, or the Item/EAN to another offer.
+     Nothing was changed. Correct or delete the wrong *Ecommerce Item*.
+   - **failed**: unexpected error. There is a separate error log with the traceback.
+4. Run it again after fixing: already linked offers are left as they are. If bol couldn't be reached,
+   the job stops, logs how far it got, and a rerun is safe.
+
 **For developers** (details in `docs/decisions.md`, ADR-004/005):
 
 ```python
