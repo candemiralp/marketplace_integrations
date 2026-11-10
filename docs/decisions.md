@@ -573,3 +573,58 @@ demo item is shipped already). The cancellation PUT answers a canned 202 `CANCEL
 second line therefore shares the first line's Bol Process (`track` is idempotent per id), and, like every demo
 process, it stays `PENDING`. Production ids are unique per request. The flows are covered by tests against an
 in-memory fake.
+
+---
+
+## ADR-014 — Returns (story 11)
+
+**Context.** Checked on 2026-11-10 against `docs/bol-openapi/retailer-api-v10.json` (Retailer API v10, Returns),
+ERPNext 15.124.5 and the demo environment.
+
+| Story says | Spec / ERPNext / demo says | Decision |
+|---|---|---|
+| `GET /retailer/returns?handled=false&fulfilment-method=FBR&page=N` | Confirmed (`ReturnsResponse.returns[]` = `ReducedReturn`). `ReducedReturnItem` has `rmaId`, `orderId`, `ean`, `expectedQuantity`, `returnReason`, `handled` | The list is enough: the detail (`title`, `trackAndTrace`, `customerDetails`) isn't fetched on import. Paged until an empty page; only page 1 on the demo. |
+| `GET /retailer/returns/{return-id}` | The path takes the **returnId**, not the rmaId | Return DNs also store `bol_return_id`, so the "already handled" check can GET the return. |
+| `PUT /retailer/returns/{rma-id}` `{handlingResult, quantityReturned}` → 202 | Confirmed, media type v10; the six `handlingResult` values match the story. **`quantityReturned` has `minimum: 1`** | **Owner decision:** *Report to bol without stock return* sends `quantityReturned = expectedQuantity` (the units handled, which the customer keeps), not 0. |
+| `returnReason {mainReason, detailedReason, customerComments}` | `detailedReason` nullable; the demo leaves it out and often repeats the main reason as the comment | `bol_return_reason` = main — detailed: comments, a repeated comment left out, truncated to 140 characters. |
+| Poll with `job_id="bol_poll_returns"` | Frappe v15's scheduler enqueues `scheduled_job::<method>` and skips a run while the previous one is queued or running (ADR-006) | The cron (`*/30 * * * *`) calls `returns.poll_returns` directly. |
+| `DuplicateEntryError` means it was created already | A unique custom field raises `UniqueValidationError` (as in story 07) | Both count as done, and so does a return DN found by `bol_rma_id` after the rollback. |
+| Hidden field for the expected quantity | — | `bol_expected_qty` (Int, hidden). |
+
+**Decisions.**
+- **Finding the original DN**: submitted Sales Orders with `bol_order_id = orderId` → submitted, non-return DN lines
+  of those SOs whose item has the return's EAN (`offers.items_by_ean`). What a line can still take back is
+  `qty − returned_qty − units on draft bol returns of that line` (ERPNext only counts submitted returns). The oldest DN
+  whose line covers `expectedQuantity` is used. None → `log_once` (`bol:failed:return_not_found:{rma}`) and a ToDo for
+  *Notify User* with the return's details (referencing the SO if there is one); no DN.
+- **The draft** comes from ERPNext's `make_sales_return(dn)`, reduced to the returned line with `qty = -expectedQuantity`.
+  One ToDo per RMA for *Notify User* (none when unset). One savepoint and one commit per RMA. Any failure is rolled
+  back, logged once per 6 h, and retried on the next poll.
+- **Submit checks** (`before_submit`) run whenever `bol_rma_id` is set, even with *Handle Returns* off (no bol call):
+  a handling result, whole units, `Σ|qty| ≤ bol_expected_qty`. Inspection may lower the qty; that's what's reported.
+- **Reporting** (`report_handling`, background job `bol_return::{dn}`): PUT → Bol Process `return_handling`. Status
+  stays *Open* until bol's process succeeds (→ *Reported*). A 400, or a FAILURE process, GETs the return: if bol has
+  the RMA handled (a second PUT, or the seller dashboard), it's *Reported* with a comment, otherwise *Failed* with
+  bol's message and a **Retry bol return report** button. Transient errors (connect, 429, 5xx) keep it *Open*, logged
+  once per 6 h. The returns poll then re-queues submitted *Open* returns that are 10 minutes old and have no
+  unfinished process (`sweep_reports`). That also reports returns submitted while *Handle Returns* was off.
+- **Without stock return** (owner decision from the story): ERPNext can't submit a zero-qty return, so the draft has
+  **Report to bol without stock return** (Bol Manager/System Manager, plus write and delete permission on the DN). It
+  sends the PUT and, once bol accepts it (202), **deletes the draft**. Its Bol Process references the **original DN**,
+  so bol's answer shows there. While that process is unfinished the poll skips the RMA (payload `rma_id`). If bol's
+  process fails and the RMA is still open, the next poll makes a new draft. A bol error on the PUT keeps the draft
+  and tells the user why. The delete is recorded in the integration log.
+- The return DN copies `bol_order_id` from the original, so the *bol.com Shipment* section is hidden on returns
+  (`depends_on … && !doc.is_return`); the *bol.com Return* section shows instead. Shipments and labels already skip
+  returns.
+- No financial documents: credit notes are story 12.
+- **Toggle**: `Bol Settings.handle_returns` (default off), in a new *Returns* section. The ToDos go to the existing
+  *Notify User*.
+
+**Demo environment (checked live, `dev.localhost`, GET only).** The unhandled list has one return (`returnId`
+15897410, rma 60283608, order 1044796550) **without `processingResults`** although the spec marks it required. Page 2
+is a 400 ("resource not available"). The detail of 15897410 has two items, one handled. Its order isn't imported
+here, so a demo poll (run once on `dev.localhost`) made one "no submitted Delivery Note" error log, no draft, and no
+ToDo (*Notify User* isn't set there). The demo's answer to the
+handling PUT wasn't checked (no writes were sent from this session). The flows are covered by tests against an
+in-memory fake.

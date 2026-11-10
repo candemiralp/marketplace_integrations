@@ -3,6 +3,7 @@
 # Conventions: fieldnames start with `bol_`; bol identifiers are `read_only` and `no_copy`
 # (and `unique` where they are a natural key).
 
+from marketplace_integrations.bol.mappers.returns import HANDLING_RESULTS
 from marketplace_integrations.bol.mappers.shipment import TRANSPORTER_CODES
 
 # The party bol's buyer is (all bol orders are booked on one bol customer): what an invoice must name.
@@ -164,7 +165,8 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"fieldtype": "Section Break",
 			"label": "bol.com Shipment",
 			"insert_after": "lr_date",
-			"depends_on": "eval:doc.bol_order_id",
+			# A return copies bol_order_id from the Delivery Note it returns; it has the bol.com Return section.
+			"depends_on": "eval:doc.bol_order_id && !doc.is_return",
 			"collapsible": 1,
 			# Like Transporter Info: open once it holds something.
 			"collapsible_depends_on": "eval:doc.bol_track_and_trace || doc.bol_shipment_status || doc.bol_label_status",
@@ -242,6 +244,73 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"fieldtype": "Data",
 			"label": "bol Label Transporter",
 			"insert_after": "bol_shipping_label_id",
+			"read_only": 1,
+			"no_copy": 1,
+		},
+		# A bol return (story 11) on the return Delivery Note. bol_rma_id is the natural key of the import.
+		{
+			"fieldname": "bol_return_section",
+			"fieldtype": "Section Break",
+			"label": "bol.com Return",
+			"insert_after": "bol_label_transporter",
+			"depends_on": "eval:doc.bol_rma_id",
+			"collapsible": 1,
+			"collapsible_depends_on": "eval:doc.bol_rma_id",
+		},
+		{
+			"fieldname": "bol_rma_id",
+			"fieldtype": "Data",
+			"label": "bol RMA ID",
+			"insert_after": "bol_return_section",
+			"unique": 1,
+			"no_copy": 1,
+			"read_only": 1,
+			"in_standard_filter": 1,
+		},
+		{
+			"fieldname": "bol_return_id",
+			"fieldtype": "Data",
+			"label": "bol Return ID",
+			"insert_after": "bol_rma_id",
+			"no_copy": 1,
+			"read_only": 1,
+		},
+		{
+			"fieldname": "bol_return_reason",
+			"fieldtype": "Small Text",
+			"label": "bol Return Reason",
+			"insert_after": "bol_return_id",
+			"no_copy": 1,
+			"read_only": 1,
+		},
+		{"fieldname": "bol_return_column", "fieldtype": "Column Break", "insert_after": "bol_return_reason"},
+		{
+			"fieldname": "bol_handling_result",
+			"fieldtype": "Select",
+			"label": "bol Handling Result",
+			"options": "\n" + "\n".join(HANDLING_RESULTS),
+			"description": "What bol is told when this return is submitted.",
+			"insert_after": "bol_return_column",
+			"no_copy": 1,
+		},
+		{
+			"fieldname": "bol_return_status",
+			"fieldtype": "Select",
+			"label": "bol Return Status",
+			"options": "\nOpen\nReported\nFailed",
+			"insert_after": "bol_handling_result",
+			"read_only": 1,
+			"allow_on_submit": 1,
+			"no_copy": 1,
+			"in_standard_filter": 1,
+		},
+		{
+			# bol's expectedQuantity: the most this return may take back.
+			"fieldname": "bol_expected_qty",
+			"fieldtype": "Int",
+			"label": "bol Expected Qty",
+			"insert_after": "bol_return_status",
+			"hidden": 1,
 			"read_only": 1,
 			"no_copy": 1,
 		},
