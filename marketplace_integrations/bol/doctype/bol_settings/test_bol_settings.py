@@ -10,6 +10,9 @@ from marketplace_integrations.bol.api.errors import BolAuthError, BolTransientEr
 from marketplace_integrations.bol.doctype.bol_settings import bol_settings
 from marketplace_integrations.bol.tests.utils import (
 	TEST_COMPANY_ABBR,
+	make_accounting_masters,
+	make_catalog_masters,
+	make_item,
 	make_order_masters,
 	make_price_list,
 	make_tax_template,
@@ -19,7 +22,17 @@ from marketplace_integrations.bol.tests.utils import (
 # These tests need no Company; ERPNext's Company test records need ERPNext's full test setup.
 # Warehouse links to Company too: the stock tests create a warehouse of their own (tests/utils.make_warehouse).
 # The order import settings link Customer and tax templates: tests/utils.make_order_masters creates them.
-test_ignore = ["Company", "Warehouse", "Customer", "Sales Taxes and Charges Template"]
+# The accounting settings link Accounts, a Supplier, a purchase template and Items: make_accounting_masters creates them.
+test_ignore = [
+	"Company",
+	"Warehouse",
+	"Customer",
+	"Sales Taxes and Charges Template",
+	"Account",
+	"Supplier",
+	"Purchase Taxes and Charges Template",
+	"Item",
+]
 
 
 class TestBolSettings(FrappeTestCase):
@@ -246,3 +259,117 @@ class TestVvbSettings(FrappeTestCase):
 	def test_needs_push_shipments(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Push Shipments"):
 			self._settings(push_shipments=0).validate()
+
+
+class TestAccountingSettings(FrappeTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		cls.masters = make_order_masters()
+
+	def setUp(self):
+		self.addCleanup(frappe.db.rollback)
+		self.accounts = make_accounting_masters()
+
+	def _settings(self, **values):
+		doc = frappe.get_single("Bol Settings")
+		doc.update(
+			{
+				"enabled": 0,
+				"company": self.masters.company,
+				"push_shipments": 1,
+				"default_transporter_code": "TNT",
+				"auto_invoice": 1,
+				"receivable_account": self.accounts.receivable_account,
+				"upload_invoices": 1,
+				"import_bol_invoices": 1,
+				"supplier": self.accounts.supplier,
+				"purchase_tax_template": self.accounts.purchase_tax_template,
+				"default_expense_account": self.accounts.default_expense_account,
+				**values,
+			}
+		)
+		doc.set("invoice_account_map", [])
+		return doc
+
+	def _map(self, doc, line_type: str, account: str | None = None, item: str | None = None):
+		doc.append(
+			"invoice_account_map",
+			{
+				"bol_line_type": line_type,
+				"expense_account": account or self.accounts.commission_account,
+				"item": item,
+			},
+		)
+
+	def test_valid(self):
+		doc = self._settings()
+		self._map(doc, " commission ")
+
+		doc.validate()
+
+		self.assertEqual(doc.invoice_account_map[0].bol_line_type, "COMMISSION")
+
+	def test_off_needs_nothing(self):
+		self._settings(
+			auto_invoice=0,
+			upload_invoices=0,
+			import_bol_invoices=0,
+			receivable_account=None,
+			supplier=None,
+			purchase_tax_template=None,
+			default_expense_account=None,
+		).validate()
+
+	def test_invoicing_needs_push_shipments(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Push Shipments"):
+			self._settings(push_shipments=0).validate()
+
+	def test_invoicing_needs_a_receivable_account(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Receivable Account"):
+			self._settings(receivable_account=None).validate()
+		with self.assertRaisesRegex(frappe.ValidationError, "isn't a Receivable account"):
+			self._settings(receivable_account=self.accounts.default_expense_account).validate()
+
+	def test_uploads_need_invoicing(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "before Upload Requested Invoices"):
+			self._settings(auto_invoice=0).validate()
+
+	def test_import_needs_supplier_template_and_account(self):
+		doc = self._settings(supplier=None, purchase_tax_template=None, default_expense_account=None)
+
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			doc.validate()
+		for label in ("Supplier", "Purchase Tax Template", "Default Expense Account"):
+			self.assertIn(label, str(ctx.exception))
+
+	def test_accounts_of_another_company_or_groups_are_rejected(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "belongs to company"):
+			self._settings(company="_Test bol Other Company", import_bol_invoices=0).validate()
+		group = frappe.db.get_value("Account", self.accounts.default_expense_account, "parent_account")
+		with self.assertRaisesRegex(frappe.ValidationError, "group account"):
+			self._settings(default_expense_account=group).validate()
+
+	def test_turnover_cant_be_mapped(self):
+		doc = self._settings()
+		self._map(doc, "TURNOVER")
+
+		with self.assertRaisesRegex(frappe.ValidationError, "settle the bol receivable"):
+			doc.validate()
+
+	def test_a_line_type_is_mapped_once(self):
+		doc = self._settings()
+		self._map(doc, "COMMISSION")
+		self._map(doc, "commission")
+
+		with self.assertRaisesRegex(frappe.ValidationError, "twice"):
+			doc.validate()
+
+	def test_mapped_item_must_not_be_a_stock_item(self):
+		make_catalog_masters()
+		item = make_item("_Test bol stock fee")
+		doc = self._settings()
+		self._map(doc, "STOCK", item=item.name)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "stock item"):
+			doc.validate()

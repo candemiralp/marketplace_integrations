@@ -6,7 +6,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, cint, flt, now_datetime
 
-from marketplace_integrations.bol import process_status
+# invoices imports this module too; each uses the other's attributes only at call time.
+from marketplace_integrations.bol import invoices, process_status
 from marketplace_integrations.bol.api.client import get_client
 from marketplace_integrations.bol.api.errors import (
 	BolError,
@@ -497,6 +498,8 @@ def _unfinished_process(dn_name: str, handler: str) -> bool:
 def _confirmed(dn, shipment_id: str | None, comment: str):
 	dn.db_set({"bol_shipment_status": CONFIRMED, "bol_shipment_id": shipment_id})
 	dn.add_comment("Comment", comment)
+	# Invoice only what bol confirmed as shipped (story 12).
+	invoices.on_shipment_confirmed(dn)
 
 
 def _set_status(dn, status: str):

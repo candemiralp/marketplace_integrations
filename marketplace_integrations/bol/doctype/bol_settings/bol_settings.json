@@ -43,7 +43,19 @@
   "vvb_column",
   "vvb_preferred_transporter",
   "returns_section",
-  "handle_returns"
+  "handle_returns",
+  "accounting_section",
+  "auto_invoice",
+  "receivable_account",
+  "upload_invoices",
+  "accounting_column",
+  "import_bol_invoices",
+  "supplier",
+  "purchase_tax_template",
+  "default_expense_account",
+  "bol_invoices_until",
+  "invoice_account_section",
+  "invoice_account_map"
  ],
  "fields": [
   {
@@ -292,13 +304,96 @@
    "fieldname": "handle_returns",
    "fieldtype": "Check",
    "label": "Handle Returns"
+  },
+  {
+   "fieldname": "accounting_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting"
+  },
+  {
+   "default": "0",
+   "description": "Submit a Sales Invoice on the Receivable Account for each bol Delivery Note once bol has confirmed the shipment, and a credit note for each bol return reported as received or exchanged. Needs Push Shipments.",
+   "fieldname": "auto_invoice",
+   "fieldtype": "Check",
+   "label": "Invoice Shipments and Returns"
+  },
+  {
+   "description": "E.g. \"Debtors - bol\". bol's payouts are reconciled against it.",
+   "fieldname": "receivable_account",
+   "fieldtype": "Link",
+   "label": "Receivable Account",
+   "mandatory_depends_on": "eval:doc.auto_invoice",
+   "options": "Account"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.auto_invoice",
+   "description": "Daily: when a business buyer asks bol for an invoice, upload the Sales Invoice as a PDF (print format bol Sales Invoice).",
+   "fieldname": "upload_invoices",
+   "fieldtype": "Check",
+   "label": "Upload Requested Invoices"
+  },
+  {
+   "fieldname": "accounting_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Daily: each bol invoice (commission, labels, other fees) becomes a draft Purchase Invoice with its PDF, for review. Never submitted automatically.",
+   "fieldname": "import_bol_invoices",
+   "fieldtype": "Check",
+   "label": "Import bol Invoices"
+  },
+  {
+   "description": "E.g. \"bol.com\".",
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "mandatory_depends_on": "eval:doc.import_bol_invoices",
+   "options": "Supplier"
+  },
+  {
+   "description": "VAT added to bol's amounts, which exclude VAT.",
+   "fieldname": "purchase_tax_template",
+   "fieldtype": "Link",
+   "label": "Purchase Tax Template",
+   "mandatory_depends_on": "eval:doc.import_bol_invoices",
+   "options": "Purchase Taxes and Charges Template"
+  },
+  {
+   "description": "For bol line types not in the account map below; they are listed in the invoice's remarks.",
+   "fieldname": "default_expense_account",
+   "fieldtype": "Link",
+   "label": "Default Expense Account",
+   "mandatory_depends_on": "eval:doc.import_bol_invoices",
+   "options": "Account"
+  },
+  {
+   "description": "Each import also reads the 7 days before this date.",
+   "fieldname": "bol_invoices_until",
+   "fieldtype": "Date",
+   "label": "bol Invoices Imported Up To",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.import_bol_invoices",
+   "fieldname": "invoice_account_section",
+   "fieldtype": "Section Break",
+   "label": "bol Invoice Accounts"
+  },
+  {
+   "description": "Where each type of bol invoice line is booked. TURNOVER and CORRECTION_TURNOVER are never booked here: they settle the Receivable Account.",
+   "fieldname": "invoice_account_map",
+   "fieldtype": "Table",
+   "label": "Invoice Account Map",
+   "options": "Bol Invoice Account Map"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 22:09:06.939214",
+ "modified": "2026-11-10 23:44:29.598081",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",

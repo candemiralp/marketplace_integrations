@@ -1,4 +1,4 @@
-// bol shipment (story 08), bol label (story 09) and bol return (story 11) on a Delivery Note. bol's work happens in the background.
+// bol shipment (story 08), bol label (story 09), bol return (story 11) and bol invoice (story 12) on a Delivery Note. bol's work happens in the background.
 
 frappe.ui.form.on("Delivery Note", {
 	onload(frm) {
@@ -23,6 +23,7 @@ frappe.ui.form.on("Delivery Note", {
 		add_label_buttons(frm);
 		add_retry_button(frm);
 		add_return_buttons(frm);
+		add_invoice_button(frm);
 	},
 });
 
@@ -179,6 +180,33 @@ function retry_return_report(frm) {
 			frappe.show_alert({
 				message: __("bol return: {0}", [__(status)]),
 				indicator: { Reported: "green", Open: "blue" }[status] || "red",
+			});
+			frm.reload_doc();
+		});
+}
+
+// bol invoices (story 12): made in the background once bol confirms; the button is offered while one is missing.
+function add_invoice_button(frm) {
+	if (frm.doc.docstatus !== 1 || !frm.doc.__onload?.bol_invoice_missing) {
+		return;
+	}
+	const label = frm.doc.is_return
+		? __("Create bol credit note")
+		: __("Create bol Sales Invoice");
+	frm.add_custom_button(label, () => retry_invoice(frm), __("bol"));
+}
+
+function retry_invoice(frm) {
+	frappe
+		.call({
+			method: "marketplace_integrations.bol.invoices.retry_invoice",
+			args: { dn_name: frm.doc.name },
+			freeze: true,
+		})
+		.then((r) => {
+			frappe.show_alert({
+				message: __("{0} submitted", [r.message.sales_invoice]),
+				indicator: "green",
 			});
 			frm.reload_doc();
 		});

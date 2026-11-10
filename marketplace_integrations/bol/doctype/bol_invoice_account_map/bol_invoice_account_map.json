@@ -1,0 +1,54 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-11-10 23:44:29.150215",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "bol_line_type",
+  "expense_account",
+  "item"
+ ],
+ "fields": [
+  {
+   "description": "bol's type of an invoice line, e.g. COMMISSION, SHIPMENT_LABEL, CORRECTION_COMMISSION.",
+   "fieldname": "bol_line_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "bol Line Type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "description": "Optional non-stock item for the line, e.g. one with a 0% Item Tax Template.",
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-10 23:44:29.150215",
+ "modified_by": "Administrator",
+ "module": "Bol",
+ "name": "Bol Invoice Account Map",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

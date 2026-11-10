@@ -48,6 +48,7 @@ class BolClient:
 		json=None,
 		params=None,
 		accept: str | None = None,
+		files: dict | None = None,
 		reference: tuple[str, str] | None = None,
 		safe: bool = False,
 	) -> dict | bytes | None:
@@ -55,6 +56,7 @@ class BolClient:
 
 		`path` is the path as written in bol's spec (`/retailer/orders`, `/shared/process-status/1`).
 		`safe=True` marks a POST that only reads (bulk queries): it's retried and logged like a GET.
+		`files` sends a multipart/form-data body ({field: (file name, bytes, content type)}), as requests takes it.
 		Successful calls are logged here; failures raise a BolError and the caller logs them
 		(`log_call(**err.details, error=err)` or `log_once`) once it has rolled back its own work.
 		"""
@@ -69,7 +71,7 @@ class BolClient:
 		while True:
 			response = None
 			try:
-				response = self._send(method, url, headers, json, params, may_duplicate)
+				response = self._send(method, url, headers, json, params, files, may_duplicate)
 				if response.status_code == 401 and not refreshed:
 					# The cached token may have been revoked or expired early: refresh once.
 					refreshed = True
@@ -80,7 +82,7 @@ class BolClient:
 				delay = _retry_delay(e, retries)
 				if delay is None:
 					e.details = e.details or _log_data(
-						method, path, url, params, json, headers, response, accept
+						method, path, url, params, json, headers, response, accept, files
 					)
 					raise
 				retries += 1
@@ -88,7 +90,7 @@ class BolClient:
 				continue
 
 			log_call(
-				**_log_data(method, path, url, params, json, headers, response, accept),
+				**_log_data(method, path, url, params, json, headers, response, accept, files),
 				reference=reference,
 				safe=safe,
 			)
@@ -102,7 +104,7 @@ class BolClient:
 			path = f"{root}-demo/{rest}"
 		return f"{API_HOST}/{path}"
 
-	def _send(self, method, url, headers, json, params, may_duplicate) -> requests.Response:
+	def _send(self, method, url, headers, json, params, files, may_duplicate) -> requests.Response:
 		token = get_token(self.settings, self.session)
 		try:
 			return self.session.request(
@@ -111,6 +113,7 @@ class BolClient:
 				headers={**headers, "Authorization": f"Bearer {token}"},
 				json=json,
 				params=params,
+				files=files,
 				timeout=TIMEOUT,
 			)
 		except (requests.ConnectionError, requests.Timeout) as e:
@@ -191,13 +194,19 @@ def _retry_delay(error: BolError, retries: int) -> float | None:
 	return None
 
 
-def _log_data(method, path, url, params, json, headers, response, accept) -> dict:
+def _log_data(method, path, url, params, json, headers, response, accept, files=None) -> dict:
+	request = {"url": url, "params": params, "headers": headers, "json": json}
+	if files:
+		# The file itself never goes in the log (an invoice holds buyer PII): its name and size do.
+		request["files"] = {
+			field: f"{name} <{len(content)} bytes>" for field, (name, content, *_) in files.items()
+		}
 	return redact(
 		{
 			"method": method,
 			"path": path,
 			"status": response.status_code if response is not None else None,
-			"request": {"url": url, "params": params, "headers": headers, "json": json},
+			"request": request,
 			"response": _response_data(response, accept),
 		}
 	)

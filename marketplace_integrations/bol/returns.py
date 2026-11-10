@@ -1,6 +1,6 @@
 # Returns (Returns API v10, story 11, ADR-014). Every unhandled FBR return becomes a draft return Delivery Note
 # against the Delivery Note that shipped it. Submitting it after inspection reports bol's handling result, and
-# process_status follows that to a final state. Never creates financial documents (story 12).
+# process_status follows that to a final state. Credit notes are made by invoices.py (story 12).
 # Every state change on the submitted return goes through db_set: it's never saved again.
 
 import frappe
@@ -8,7 +8,8 @@ from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_return
 from frappe import _
 from frappe.utils import add_to_date, cint, flt, now_datetime
 
-from marketplace_integrations.bol import offers, process_status
+# invoices imports this module too; each uses the other's attributes only at call time.
+from marketplace_integrations.bol import invoices, offers, process_status
 from marketplace_integrations.bol.api.client import get_client
 from marketplace_integrations.bol.api.errors import (
 	BolError,
@@ -117,7 +118,9 @@ def import_return(item: dict) -> str | None:
 				path=PATH,
 				request=item,
 				error=e,
-				message=_("bol return {0} not imported: {1}").format(item["rma_id"], str(e) or type(e).__name__),
+				message=_("bol return {0} not imported: {1}").format(
+					item["rma_id"], str(e) or type(e).__name__
+				),
 			)
 	return None
 
@@ -357,9 +360,9 @@ def _report_failed(dn, error: BolError):
 		if _log_failure(dn, error, once="return_report"):
 			dn.add_comment(
 				"Comment",
-				_("bol couldn't be reached to report this return ({0}). It's tried again automatically.").format(
-					str(error)
-				),
+				_(
+					"bol couldn't be reached to report this return ({0}). It's tried again automatically."
+				).format(str(error)),
 			)
 		return
 	# Credentials, an unexpected answer: a person acts.
@@ -457,7 +460,9 @@ def report_without_return(dn_name: str, handling_result: str) -> dict:
 	# Locked: a double click waits here, then finds the draft gone.
 	dn = frappe.get_doc(DOCTYPE, dn_name, for_update=True)
 	if dn.docstatus != 0 or not dn.is_return or not dn.bol_rma_id:
-		frappe.throw(_("Only a draft bol return can be reported without a stock return."), title=_("Not Allowed"))
+		frappe.throw(
+			_("Only a draft bol return can be reported without a stock return."), title=_("Not Allowed")
+		)
 	quantity = cint(dn.bol_expected_qty)
 	original = frappe.get_doc(DOCTYPE, dn.return_against)
 	try:
@@ -470,7 +475,10 @@ def report_without_return(dn_name: str, handling_result: str) -> dict:
 		)
 		# Followed on the original Delivery Note: the draft is deleted below.
 		process_status.track(
-			response, HANDLER, original, payload={**_payload(dn, handling_result, quantity), "without_return": True}
+			response,
+			HANDLER,
+			original,
+			payload={**_payload(dn, handling_result, quantity), "without_return": True},
 		)
 	except BolError as e:
 		log_call(**(e.details or {"method": "PUT", "path": PATH}), error=e, reference=_reference(dn))
@@ -482,17 +490,26 @@ def report_without_return(dn_name: str, handling_result: str) -> dict:
 	original.add_comment("Comment", message)
 	frappe.delete_doc(DOCTYPE, dn.name, ignore_permissions=True)
 	# The draft's timeline goes with it: the log keeps what happened.
-	log_call(method="report_without_return", path=f"{PATH}/{dn.bol_rma_id}", message=message, reference=_reference(original))
+	log_call(
+		method="report_without_return",
+		path=f"{PATH}/{dn.bol_rma_id}",
+		message=message,
+		reference=_reference(original),
+	)
 	return {"return_against": original.name}
 
 
 def _without_return_failed(dn, error: BolError) -> str:
-	if isinstance(error, BolValidationError) and handled_at_bol(dn.bol_return_id, dn.bol_rma_id, _reference(dn)):
+	if isinstance(error, BolValidationError) and handled_at_bol(
+		dn.bol_return_id, dn.bol_rma_id, _reference(dn)
+	):
 		return _(
 			"bol has handled return {0} already (e.g. in the seller dashboard). Submit this draft if stock came back, otherwise delete it."
 		).format(dn.bol_rma_id)
 	if isinstance(error, BolValidationError):
-		return _("bol refused the return report: {0}").format(format_violations(error.violations) or str(error))
+		return _("bol refused the return report: {0}").format(
+			format_violations(error.violations) or str(error)
+		)
 	return _("Return not reported to bol: {0}").format(str(error))
 
 
@@ -600,6 +617,8 @@ def _unfinished_process(dn_name: str) -> bool:
 def _reported(dn, comment: str):
 	dn.db_set("bol_return_status", REPORTED)
 	dn.add_comment("Comment", comment)
+	# A credit note, when the buyer gets their money back (story 12).
+	invoices.on_return_reported(dn)
 
 
 def _set_status(dn, status: str):
@@ -609,7 +628,10 @@ def _set_status(dn, status: str):
 
 def _log_failure(dn, error: Exception, once: str | None = None) -> bool:
 	"""Log a failure for the return; with `once` (the failure kind), at most once per 6 hours."""
-	details = getattr(error, "details", None) or {"method": "report_handling", "path": f"{PATH}/{dn.bol_rma_id}"}
+	details = getattr(error, "details", None) or {
+		"method": "report_handling",
+		"path": f"{PATH}/{dn.bol_rma_id}",
+	}
 	if once:
 		return log_once(once, dn.name, **details, error=error, reference=_reference(dn))
 	log_call(**details, error=error, reference=_reference(dn))
