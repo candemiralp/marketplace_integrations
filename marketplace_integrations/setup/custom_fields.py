@@ -165,6 +165,9 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"label": "bol.com Shipment",
 			"insert_after": "lr_date",
 			"depends_on": "eval:doc.bol_order_id",
+			"collapsible": 1,
+			# Like Transporter Info: open once it holds something.
+			"collapsible_depends_on": "eval:doc.bol_track_and_trace || doc.bol_shipment_status",
 		},
 		{
 			# Set from the Sales Order on every validate.
