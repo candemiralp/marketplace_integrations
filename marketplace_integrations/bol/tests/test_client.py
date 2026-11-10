@@ -169,6 +169,22 @@ class TestBolClient(FrappeTestCase):
 		self.assertEqual(bol.request("GET", "/retailer/orders", version=10), ORDERS)
 		self.assertEqual(len(session.calls), 2)
 
+	def test_read_timeout_on_safe_post_is_retried(self):
+		statuses = {"processStatuses": []}
+		bol, session = self._client(requests.ReadTimeout(), make_response(200, statuses))
+
+		result = bol.request("POST", "/shared/process-status", version=10, json={}, safe=True)
+
+		self.assertEqual(result, statuses)
+		self.assertEqual(len(session.calls), 2)
+		self.assertTrue(self.log_call.call_args.kwargs["safe"])
+
+	def test_gateway_error_on_safe_post_is_retried(self):
+		bol, session = self._client(make_response(504), make_response(200, {"processStatuses": []}))
+
+		bol.request("POST", "/shared/process-status", version=10, json={}, safe=True)
+		self.assertEqual(len(session.calls), 2)
+
 	def test_connection_refused_on_post_is_retried(self):
 		refused = requests.ConnectionError(
 			MaxRetryError(None, "/retailer/offers", NewConnectionError(None, "Connection refused"))

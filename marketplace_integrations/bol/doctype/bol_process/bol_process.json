@@ -1,0 +1,161 @@
+{
+ "actions": [],
+ "autoname": "field:process_status_id",
+ "creation": "2026-11-10 15:39:45.157638",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "process_status_id",
+  "handler",
+  "status",
+  "bol_status",
+  "reference_column",
+  "reference_doctype",
+  "reference_name",
+  "entity_id",
+  "progress_section",
+  "attempts",
+  "next_check_at",
+  "progress_column",
+  "error_message",
+  "payload_section",
+  "payload"
+ ],
+ "fields": [
+  {
+   "fieldname": "process_status_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Process Status ID",
+   "no_copy": 1,
+   "read_only": 1,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "handler",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Handler",
+   "options": "shipment\ntransport\nshipping_label\ncancellation\nreturn_handling\ncontent",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "PENDING",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "PENDING\nSUCCESS\nFAILURE\nTIMEOUT\nHANDLER_ERROR",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "The final status bol reported. Differs from Status only when the handler failed.",
+   "fieldname": "bol_status",
+   "fieldtype": "Select",
+   "label": "bol Status",
+   "options": "\nPENDING\nSUCCESS\nFAILURE\nTIMEOUT",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reference_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Reference DocType",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Reference Name",
+   "options": "reference_doctype",
+   "read_only": 1
+  },
+  {
+   "fieldname": "entity_id",
+   "fieldtype": "Data",
+   "label": "Entity ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "progress_section",
+   "fieldtype": "Section Break",
+   "label": "Progress"
+  },
+  {
+   "default": "0",
+   "fieldname": "attempts",
+   "fieldtype": "Int",
+   "label": "Attempts",
+   "read_only": 1
+  },
+  {
+   "fieldname": "next_check_at",
+   "fieldtype": "Datetime",
+   "label": "Next Check At",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "progress_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "error_message",
+   "fieldtype": "Small Text",
+   "label": "Error Message",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payload_section",
+   "fieldtype": "Section Break",
+   "label": "Payload"
+  },
+  {
+   "fieldname": "payload",
+   "fieldtype": "JSON",
+   "label": "Payload",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-11-10 15:40:06.815825",
+ "modified_by": "Administrator",
+ "module": "Bol",
+ "name": "Bol Process",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager"
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Bol Manager"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "process_status_id"
+}

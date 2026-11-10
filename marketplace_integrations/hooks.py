@@ -166,6 +166,15 @@ after_migrate = "marketplace_integrations.install.after_migrate"
 # Scheduled Tasks
 # ---------------
 
+# The scheduler never queues a job again while the previous run is queued or running
+# (job id `scheduled_job::<method>`), so polls don't overlap (ADR-006).
+scheduler_events = {
+	"cron": {
+		"* * * * *": ["marketplace_integrations.bol.process_status.poll_pending"],
+	},
+	"daily": ["marketplace_integrations.bol.process_status.delete_old_processes"],
+}
+
 # scheduler_events = {
 # 	"all": [
 # 		"marketplace_integrations.tasks.all"
