@@ -106,7 +106,9 @@ class FakeShipments:
 		return process_id
 
 	def posts(self) -> list[dict]:
-		return [body for method, path, body, _params in self.calls if (method, path) == ("POST", shipments.PATH)]
+		return [
+			body for method, path, body, _params in self.calls if (method, path) == ("POST", shipments.PATH)
+		]
 
 	def puts(self) -> list[tuple[str, dict]]:
 		return [(path, body) for method, path, body, _params in self.calls if method == "PUT"]
@@ -115,7 +117,9 @@ class FakeShipments:
 		if (method, path) == ("GET", shipments.PATH):
 			return {
 				"shipments": [
-					self._reduced(s) for s in self.shipments.values() if s["order"]["orderId"] == params["order-id"]
+					self._reduced(s)
+					for s in self.shipments.values()
+					if s["order"]["orderId"] == params["order-id"]
 				]
 			}
 		if method == "GET":
@@ -184,7 +188,9 @@ class ShipmentTestCase(FrappeTestCase):
 		self.addCleanup(patcher.stop)
 		return patcher.start()
 
-	def _sales_order(self, order_id: str | None = None, party: str = "RETAILER", second_party: str | None = None) -> str:
+	def _sales_order(
+		self, order_id: str | None = None, party: str = "RETAILER", second_party: str | None = None
+	) -> str:
 		order = copy.deepcopy(ORDER)
 		order["orderId"] = order_id or f"A{next(self.order_ids)}"
 		for line, line_party in zip(order["orderItems"], (party, second_party or party), strict=True):
@@ -194,7 +200,9 @@ class ShipmentTestCase(FrappeTestCase):
 		with patch.object(orders, "get_system_timezone", return_value=TZ):
 			return orders.create_sales_order(order, settings)
 
-	def _delivery_note(self, so_name: str | None = None, submit: bool = True, track_and_trace=TRACK, **values):
+	def _delivery_note(
+		self, so_name: str | None = None, submit: bool = True, track_and_trace=TRACK, **values
+	):
 		dn = make_delivery_note(so_name or self._sales_order())
 		dn.update({"bol_track_and_trace": track_and_trace, **values})
 		dn.insert()
@@ -345,15 +353,21 @@ class TestConfirm(ShipmentTestCase):
 		self.assertEqual(
 			body,
 			{
-				"orderItems": [{"orderItemId": SHIRT_ITEM, "quantity": 2}, {"orderItemId": BAG_ITEM, "quantity": 1}],
+				"orderItems": [
+					{"orderItemId": SHIRT_ITEM, "quantity": 2},
+					{"orderItemId": BAG_ITEM, "quantity": 1},
+				],
 				"shipmentReference": dn.name,
 				"transport": {"transporterCode": "TNT", "trackAndTrace": TRACK},
 			},
 		)
 		process = frappe.get_doc(process_status.DOCTYPE, "ps-ship-1")
-		self.assertEqual((process.handler, process.reference_doctype, process.reference_name), ("shipment", DN, dn.name))
 		self.assertEqual(
-			frappe.parse_json(process.payload), {"order_item_ids": [SHIRT_ITEM, BAG_ITEM], "track_and_trace": TRACK}
+			(process.handler, process.reference_doctype, process.reference_name), ("shipment", DN, dn.name)
+		)
+		self.assertEqual(
+			frappe.parse_json(process.payload),
+			{"order_item_ids": [SHIRT_ITEM, BAG_ITEM], "track_and_trace": TRACK},
 		)
 		self.assertEqual(self._state(dn), ("Pending", None))
 
@@ -459,7 +473,10 @@ class TestConfirm(ShipmentTestCase):
 		self.bol.list_references = False
 		shipment_id = self.bol.ship(
 			{
-				"orderItems": [{"orderItemId": SHIRT_ITEM, "quantity": 2}, {"orderItemId": BAG_ITEM, "quantity": 1}],
+				"orderItems": [
+					{"orderItemId": SHIRT_ITEM, "quantity": 2},
+					{"orderItemId": BAG_ITEM, "quantity": 1},
+				],
 				"shipmentReference": "shipped in the seller dashboard",
 			}
 		)
@@ -472,7 +489,12 @@ class TestConfirm(ShipmentTestCase):
 	def test_other_quantities_are_not_this_shipment(self):
 		dn = self._delivery_note()
 		self.bol.ship(
-			{"orderItems": [{"orderItemId": SHIRT_ITEM, "quantity": 1}, {"orderItemId": BAG_ITEM, "quantity": 1}]}
+			{
+				"orderItems": [
+					{"orderItemId": SHIRT_ITEM, "quantity": 1},
+					{"orderItemId": BAG_ITEM, "quantity": 1},
+				]
+			}
 		)
 
 		shipments.confirm_shipment(dn.name)
@@ -576,7 +598,12 @@ class TestTrackAndTrace(ShipmentTestCase):
 
 		self.assertEqual(
 			self.bol.puts(),
-			[(f"{shipments.TRANSPORT_PATH}/{transport_id}", {"transporterCode": "TNT", "trackAndTrace": TRACK})],
+			[
+				(
+					f"{shipments.TRANSPORT_PATH}/{transport_id}",
+					{"transporterCode": "TNT", "trackAndTrace": TRACK},
+				)
+			],
 		)
 		self._finish()
 		self.assertIn(f"Track & trace {TRACK} added at bol.", self._comments(dn)[-1])
@@ -615,7 +642,10 @@ class TestTrackAndTrace(ShipmentTestCase):
 	def test_bol_error_is_logged_and_commented(self):
 		dn = self._confirmed_dn(track_and_trace=None)
 		dn.db_set("bol_track_and_trace", TRACK)
-		self.bol.errors[("GET", f"{shipments.PATH}/{dn.bol_shipment_id}")] = (BolServerError("HTTP 500"), False)
+		self.bol.errors[("GET", f"{shipments.PATH}/{dn.bol_shipment_id}")] = (
+			BolServerError("HTTP 500"),
+			False,
+		)
 
 		shipments.update_transport(dn.name)
 
@@ -706,7 +736,9 @@ class TestSweep(ShipmentTestCase):
 
 		shipments.sweep_shipments()
 
-		self.assertEqual(sorted(c.args[0] for c in self.enqueued.call_args_list), sorted([lost.name, unknown.name]))
+		self.assertEqual(
+			sorted(c.args[0] for c in self.enqueued.call_args_list), sorted([lost.name, unknown.name])
+		)
 		self.assertNotIn(recent.name, [c.args[0] for c in self.enqueued.call_args_list])
 
 	def test_switched_off_does_nothing(self):
@@ -730,6 +762,11 @@ class TestEnqueue(FrappeTestCase):
 		self.assertEqual(confirm.args, (shipments.CONFIRM_METHOD,))
 		self.assertEqual(
 			confirm.kwargs,
-			{"dn_name": "DN-1", "job_id": "bol_ship::DN-1", "deduplicate": True, "enqueue_after_commit": True},
+			{
+				"dn_name": "DN-1",
+				"job_id": "bol_ship::DN-1",
+				"deduplicate": True,
+				"enqueue_after_commit": True,
+			},
 		)
 		self.assertEqual(transport.kwargs["job_id"], "bol_transport::DN-1")
