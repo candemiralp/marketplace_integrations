@@ -330,6 +330,9 @@ come in as draft Purchase Invoices to review. Have your accountant confirm the a
    numbers) and uploaded. The upload is followed as a Bol Process; the Sales Invoice's timeline says when it's done.
    A request for a shipment without a Sales Invoice here is logged; upload that one in the bol seller dashboard.
    The PDF is made by wkhtmltopdf, which needs the workers to reach the site's URL (`host_name`).
+   **Notify User** (*Orders* section) gets a ToDo for every incoming request, on the Sales Invoice (or the Delivery
+   Note, or nothing when the shipment isn't known here). It **closes itself** once bol has the upload, so an open one
+   needs you: the timeline and the integration log say why. Closed ones are the history of requests.
 8. On the demo environment the invoice import ends in an error log (bol's demo "PDF" isn't a PDF), and the invoice
    requests belong to shipments that don't exist here.
 

@@ -119,7 +119,9 @@ class TestPurchaseInvoice(unittest.TestCase):
 		result = mapped(invoice(-83.5, 2.52), lines)
 
 		self.assertEqual([entry["line_type"] for entry in result["lines"]], ["COMMISSION"])
-		self.assertEqual(result["settled"], {"types": ["CORRECTION_TURNOVER", "TURNOVER"], "net": -95.5, "vat": 0})
+		self.assertEqual(
+			result["settled"], {"types": ["CORRECTION_TURNOVER", "TURNOVER"], "net": -95.5, "vat": 0}
+		)
 		self.assertEqual(result["expected"], {"net": 12.0, "vat": 2.52})
 		# The fees are what bol charges: a normal invoice, though bol pays out on balance.
 		self.assertFalse(result["is_return"])
@@ -161,7 +163,9 @@ class TestPurchaseInvoice(unittest.TestCase):
 		self.assertAlmostEqual(sum(entry["rate"] for entry in result["lines"]), 218.04, places=6)
 
 	def test_no_pdf_media_type(self):
-		item = invoice(1, 0.21, invoiceMediaTypes={"availableMediaTypes": ["application/vnd.retailer.v10+json"]})
+		item = invoice(
+			1, 0.21, invoiceMediaTypes={"availableMediaTypes": ["application/vnd.retailer.v10+json"]}
+		)
 
 		self.assertFalse(mapped(item, [line("COMMISSION", 1, 0.21)])["has_pdf"])
 

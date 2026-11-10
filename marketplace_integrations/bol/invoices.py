@@ -9,7 +9,7 @@ import frappe
 from erpnext.controllers.accounts_controller import get_taxes_and_charges
 from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_invoice
 from frappe import _
-from frappe.utils import add_days, getdate, get_system_timezone, today
+from frappe.utils import add_days, get_system_timezone, getdate, today
 
 from marketplace_integrations.bol import process_status, returns, shipments
 from marketplace_integrations.bol.api.client import get_client
@@ -195,7 +195,13 @@ def _against_original(credit_note, return_dn):
 
 def onload_delivery_note(doc, method=None):
 	# Tells the form whether to offer Create bol Sales Invoice.
-	if doc.docstatus == 1 and doc.bol_order_id and invoicing_on() and invoice_due(doc) and not invoiced(doc.name):
+	if (
+		doc.docstatus == 1
+		and doc.bol_order_id
+		and invoicing_on()
+		and invoice_due(doc)
+		and not invoiced(doc.name)
+	):
 		doc.set_onload("bol_invoice_missing", True)
 
 
@@ -207,7 +213,9 @@ def retry_invoice(dn_name: str) -> dict:
 	frappe.has_permission(DN, "read", dn_name, throw=True)
 	frappe.has_permission(SI, "create", throw=True)
 	if not invoicing_on():
-		frappe.throw(_("Switch on Invoice Shipments and Returns in Bol Settings first."), title=_("bol Disabled"))
+		frappe.throw(
+			_("Switch on Invoice Shipments and Returns in Bol Settings first."), title=_("bol Disabled")
+		)
 	# Locked: a double click, or the job, waits here and then finds the invoice.
 	dn = frappe.get_doc(DN, dn_name, for_update=True)
 	if not invoice_due(dn):
@@ -243,7 +251,12 @@ def sweep_sales_invoices():
 	since = add_days(today(), -SWEEP_DAYS)
 	shipped = frappe.get_all(
 		DN,
-		filters={"docstatus": 1, "is_return": 0, "bol_shipment_status": shipments.CONFIRMED, "posting_date": (">=", since)},
+		filters={
+			"docstatus": 1,
+			"is_return": 0,
+			"bol_shipment_status": shipments.CONFIRMED,
+			"posting_date": (">=", since),
+		},
 		order_by="posting_date asc",
 		pluck="name",
 	)
@@ -265,7 +278,9 @@ def sweep_sales_invoices():
 		return
 	billed = set(
 		frappe.get_all(
-			"Sales Invoice Item", filters={"parenttype": SI, "delivery_note": ("in", names)}, pluck="delivery_note"
+			"Sales Invoice Item",
+			filters={"parenttype": SI, "delivery_note": ("in", names)},
+			pluck="delivery_note",
 		)
 	)
 	for name in names:
@@ -291,7 +306,9 @@ def poll_bol_invoices():
 		return
 	client = get_client()
 	end = getdate(today())
-	anchor = bol_invoice.anchor_date(getdate(settings.bol_invoices_until) if settings.bol_invoices_until else None, end)
+	anchor = bol_invoice.anchor_date(
+		getdate(settings.bol_invoices_until) if settings.bol_invoices_until else None, end
+	)
 	all_done = True
 	for item in listed_invoices(client, bol_invoice.window_start(anchor), end):
 		if frappe.db.exists(PI, {"bol_invoice_id": str(item["invoiceId"])}):
@@ -309,7 +326,9 @@ def listed_invoices(client, start, end) -> list[dict]:
 	listed = {}
 	for period in periods:
 		params = (
-			{"period-start-date": period[0].isoformat(), "period-end-date": period[1].isoformat()} if period else None
+			{"period-start-date": period[0].isoformat(), "period-end-date": period[1].isoformat()}
+			if period
+			else None
 		)
 		try:
 			response = client.request("GET", INVOICES_PATH, version=VERSION, params=params)
@@ -446,7 +465,9 @@ def _purchase_line(line: dict) -> dict:
 
 
 def _remarks(mapped: dict) -> str:
-	parts = [_("bol invoice {0} ({1}), imported for review.").format(mapped["invoice_id"], mapped["invoice_type"])]
+	parts = [
+		_("bol invoice {0} ({1}), imported for review.").format(mapped["invoice_id"], mapped["invoice_type"])
+	]
 	settled = mapped["settled"]
 	if settled["types"]:
 		parts.append(
@@ -472,13 +493,18 @@ def _mismatch(pi, expected: dict) -> str | None:
 	if not found:
 		return None
 	return "MISMATCH: " + "; ".join(
-		_("{0} {1} here, {2} on bol's invoice").format(labels[key], ours, theirs) for key, ours, theirs in found
+		_("{0} {1} here, {2} on bol's invoice").format(labels[key], ours, theirs)
+		for key, ours, theirs in found
 	)
 
 
 def _attach_pdf(client, pi, invoice_id: str):
 	pdf = client.request(
-		"GET", f"{INVOICES_PATH}/{invoice_id}", version=VERSION, accept=bol_invoice.PDF_MEDIA_TYPE, reference=(PI, pi.name)
+		"GET",
+		f"{INVOICES_PATH}/{invoice_id}",
+		version=VERSION,
+		accept=bol_invoice.PDF_MEDIA_TYPE,
+		reference=(PI, pi.name),
 	)
 	# Anything else would fail Frappe's PDF check with a raw parser error (the demo sends plain text).
 	if not (isinstance(pdf, bytes) and pdf.startswith(PDF_SIGNATURE)):
@@ -559,8 +585,11 @@ def invoice_requests(client) -> list[dict]:
 
 def upload_invoice(client, request: dict):
 	shipment_id = request["shipment_id"]
-	dn_name = frappe.db.get_value(DN, {"bol_shipment_id": shipment_id, "docstatus": 1, "is_return": 0}, "name")
+	dn_name = frappe.db.get_value(
+		DN, {"bol_shipment_id": shipment_id, "docstatus": 1, "is_return": 0}, "name"
+	)
 	si_name = _shipment_invoice(dn_name) if dn_name else None
+	_notify_request(request, (SI, si_name) if si_name else (DN, dn_name) if dn_name else None)
 	if not si_name:
 		_no_invoice(request, dn_name)
 		return
@@ -572,18 +601,25 @@ def upload_invoice(client, request: dict):
 	except Exception as e:
 		frappe.db.rollback(save_point=UPLOAD_SAVEPOINT)
 		# An ambiguous POST isn't sent again blindly: the next run sees whether bol still lists the request.
-		details = getattr(e, "details", None) or {"method": UPLOAD_METHOD, "path": f"{UPLOAD_PATH}/{shipment_id}"}
+		details = getattr(e, "details", None) or {
+			"method": UPLOAD_METHOD,
+			"path": f"{UPLOAD_PATH}/{shipment_id}",
+		}
 		if log_once("invoice_upload", shipment_id, **details, error=e, reference=(SI, si_name)):
 			add_comment(
 				(SI, si_name),
-				_("Invoice not uploaded to bol for shipment {0}: {1}").format(shipment_id, str(e) or type(e).__name__),
+				_("Invoice not uploaded to bol for shipment {0}: {1}").format(
+					shipment_id, str(e) or type(e).__name__
+				),
 			)
 
 
 def _upload(client, si_name: str, shipment_id: str):
 	pdf = frappe.get_print(SI, si_name, print_format=PRINT_FORMAT, as_pdf=True)
 	if len(pdf) > MAX_UPLOAD_BYTES:
-		raise BolMappingError(f"The PDF of {si_name} is {len(pdf)} bytes; bol takes at most 2 MB", reason="too_large")
+		raise BolMappingError(
+			f"The PDF of {si_name} is {len(pdf)} bytes; bol takes at most 2 MB", reason="too_large"
+		)
 	response = client.request(
 		"POST",
 		f"{UPLOAD_PATH}/{shipment_id}",
@@ -591,14 +627,20 @@ def _upload(client, si_name: str, shipment_id: str):
 		files={"invoice": (f"{si_name}.pdf", pdf, "application/pdf")},
 		reference=(SI, si_name),
 	)
-	process_status.track(response, UPLOAD_HANDLER, frappe.get_doc(SI, si_name), payload={"shipment_id": shipment_id})
+	process_status.track(
+		response, UPLOAD_HANDLER, frappe.get_doc(SI, si_name), payload={"shipment_id": shipment_id}
+	)
 
 
 def _shipment_invoice(dn_name: str) -> str | None:
 	parents = frappe.get_all(
-		"Sales Invoice Item", filters={"parenttype": SI, "delivery_note": dn_name, "docstatus": 1}, pluck="parent"
+		"Sales Invoice Item",
+		filters={"parenttype": SI, "delivery_note": dn_name, "docstatus": 1},
+		pluck="parent",
 	)
-	invoices = frappe.get_all(SI, filters={"name": ("in", parents), "is_return": 0}, pluck="name") if parents else []
+	invoices = (
+		frappe.get_all(SI, filters={"name": ("in", parents), "is_return": 0}, pluck="name") if parents else []
+	)
 	return invoices[0] if invoices else None
 
 
@@ -625,6 +667,48 @@ def _no_invoice(request: dict, dn_name: str | None):
 		add_comment(reference, message)
 
 
+def _notify_request(request: dict, reference: tuple[str, str] | None):
+	"""One open ToDo per requested shipment for the Notify User; none when no user is set. It closes itself once
+	bol has the upload, so an open one is a request that needs a person."""
+	user = _settings().notify_user
+	key = _request_key(request["shipment_id"])
+	if not user or frappe.db.exists(
+		"ToDo", {"allocated_to": user, "status": "Open", "description": ("like", f"%{key}%")}
+	):
+		return
+	reference_type, reference_name = reference or (None, None)
+	description = _(
+		"A bol buyer asked for an invoice (bol order {0}). It's uploaded automatically and this ToDo closes once bol has it. Still open after a day? The timeline and the Ecommerce Integration Log say why."
+	).format(request.get("order_id") or "-")
+	frappe.get_doc(
+		{
+			"doctype": "ToDo",
+			"allocated_to": user,
+			"reference_type": reference_type,
+			"reference_name": reference_name,
+			# The key finds this ToDo again: the poll sees an open request every day until bol has the invoice.
+			"description": f"{description} {key}",
+		}
+	).insert(ignore_permissions=True)
+
+
+def _close_request_todos(shipment_id: str | None):
+	if not shipment_id:
+		return
+	for name in frappe.get_all(
+		"ToDo",
+		filters={"status": "Open", "description": ("like", f"%{_request_key(shipment_id)}%")},
+		pluck="name",
+	):
+		todo = frappe.get_doc("ToDo", name)
+		todo.status = "Closed"
+		todo.save(ignore_permissions=True)
+
+
+def _request_key(shipment_id: str) -> str:
+	return f"[bol shipment {shipment_id}]"
+
+
 def _unfinished_upload(si_name: str) -> bool:
 	return bool(
 		frappe.db.exists(
@@ -644,6 +728,7 @@ def on_upload_success(process, entity_id, payload):
 		(process.reference_doctype, process.reference_name),
 		_("Invoice uploaded to bol for shipment {0}.").format(payload.get("shipment_id")),
 	)
+	_close_request_todos(payload.get("shipment_id"))
 
 
 def on_upload_failure(process, message, payload):

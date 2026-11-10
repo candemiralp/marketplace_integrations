@@ -224,7 +224,7 @@
    "options": "Sales Taxes and Charges Template"
   },
   {
-   "description": "Gets a ToDo when a buyer asks to cancel a bol order, and for every bol return to inspect.",
+   "description": "Gets a ToDo when a buyer asks to cancel a bol order, for every bol return to inspect, and for every invoice a business buyer asks bol for.",
    "fieldname": "notify_user",
    "fieldtype": "Link",
    "label": "Notify User",
@@ -393,7 +393,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 23:44:29.598081",
+ "modified": "2026-11-11 00:20:33.661371",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",
