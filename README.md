@@ -162,6 +162,10 @@ be checked up to reading offers.
    - *Customer* is the bol customer; *Customer's Purchase Order* and *bol Order ID* are bol's order number. The
      shipping address (and a billing address if it's different) is a new Address with *bol Buyer* ticked,
      linked to that customer. The e-mail on it is bol's relay address: use it only for the shipping label.
+   - Every bol order is booked on that one customer, so the buyer is on the order itself: *bol Buyer Name*,
+     *Company*, *VAT Number* and *KvK Number* (tab *Address & Contact*, from bol's billing details). They are
+     copied to the Delivery Note and Sales Invoice (section *Customer's Purchase Order*), for invoices to business
+     buyers.
    - One line per open order item: the Item is found by its EAN barcode. The rate is what the buyer paid per unit
      (bol's price minus bol's discount, shown as *Discount Amount*). Each line has *bol Order Item ID*,
      *Distribution Party*, *Latest Delivery Date* and *Commission* (section *bol.com*). Units already shipped or

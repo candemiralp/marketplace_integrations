@@ -75,6 +75,7 @@ def to_sales_order(order: dict, ctx: dict) -> dict | None:
 			# The buyer paid bol's total to the cent: no rounding to whole euros.
 			"disable_rounded_total": 1,
 			"taxes_and_charges": template,
+			**_buyer(billing or shipment),
 			"items": lines,
 		},
 		"shipping_address": to_address(shipment, "Shipping", ctx),
@@ -84,7 +85,11 @@ def to_sales_order(order: dict, ctx: dict) -> dict | None:
 
 
 def open_quantity(line: dict) -> int:
-	return (line.get("quantity") or 0) - (line.get("quantityCancelled") or 0) - (line.get("quantityShipped") or 0)
+	return (
+		(line.get("quantity") or 0)
+		- (line.get("quantityCancelled") or 0)
+		- (line.get("quantityShipped") or 0)
+	)
 
 
 def placed_datetime(order: dict, timezone: str):
@@ -99,10 +104,9 @@ def to_address(details: dict, address_type: str, ctx: dict) -> dict:
 	if not country:
 		raise BolMappingError(f"Unknown country code: {code or '(none)'}", reason="country")
 	extension = details.get("houseNumberExtension")
-	name = f"{details.get('firstName') or ''} {details.get('surname') or ''}".strip()
 	return {
 		"doctype": "Address",
-		"address_title": details.get("company") or name,
+		"address_title": details.get("company") or _full_name(details),
 		"address_type": address_type,
 		"address_line1": f"{details.get('streetName')} {details.get('houseNumber')}"
 		+ (f" {extension}" if extension else ""),
@@ -125,6 +129,20 @@ def to_address(details: dict, address_type: str, ctx: dict) -> dict:
 def money(value) -> float:
 	# Half-up to cents, as on bol's invoices (round() on floats rounds 0.125 down).
 	return float(Decimal(str(value or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _buyer(details: dict) -> dict:
+	"""The party the invoice names: bol books every order on one customer (billing details, else shipment)."""
+	return {
+		"bol_buyer_name": _full_name(details) or None,
+		"bol_buyer_company": details.get("company") or None,
+		"bol_buyer_vat_number": details.get("vatNumber") or None,
+		"bol_buyer_kvk_number": details.get("kvkNumber") or None,
+	}
+
+
+def _full_name(details: dict) -> str:
+	return f"{details.get('firstName') or ''} {details.get('surname') or ''}".strip()
 
 
 def _placed(order: dict, ctx: dict):
@@ -176,7 +194,8 @@ def _line(line: dict, quantity: int, ctx: dict, warnings: list) -> dict:
 		"bol_order_item_id": order_item_id,
 		"bol_distribution_party": fulfilment.get("distributionParty"),
 		# Empty when the buyer chose an exact delivery date instead.
-		"bol_latest_delivery_date": fulfilment.get("latestDeliveryDate") or fulfilment.get("exactDeliveryDate"),
+		"bol_latest_delivery_date": fulfilment.get("latestDeliveryDate")
+		or fulfilment.get("exactDeliveryDate"),
 		"bol_commission": money(line.get("commission")),
 	}
 

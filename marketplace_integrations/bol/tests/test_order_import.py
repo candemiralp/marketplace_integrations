@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import frappe
-from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
+from erpnext.selling.doctype.sales_order.sales_order import SalesOrder, make_delivery_note, make_sales_invoice
 from frappe.tests.utils import FrappeTestCase
 
 from marketplace_integrations.bol import orders
@@ -120,7 +120,9 @@ class TestImport(OrderImportTestCase):
 
 		so = self._sales_order("A1")
 		self.assertEqual(so.docstatus, 1)
-		self.assertEqual((so.customer, so.company, so.po_no), (self.masters.customer, self.masters.company, "A1"))
+		self.assertEqual(
+			(so.customer, so.company, so.po_no), (self.masters.customer, self.masters.company, "A1")
+		)
 		self.assertEqual(str(so.transaction_date), "2026-11-09")
 		self.assertEqual(str(so.delivery_date), "2026-11-11")
 		self.assertEqual(
@@ -175,9 +177,16 @@ class TestImport(OrderImportTestCase):
 		so = self._sales_order("A1")
 		self.assertEqual(so.customer_address, so.shipping_address_name)
 		address = frappe.get_doc("Address", so.shipping_address_name)
-		self.assertEqual((address.address_line1, address.pincode, address.city), ("Dorpstraat 1 B", "1111ZZ", "Utrecht"))
-		self.assertEqual((address.country, address.address_type, address.bol_buyer), ("Netherlands", "Shipping", 1))
-		self.assertEqual([(link.link_doctype, link.link_name) for link in address.links], [("Customer", self.masters.customer)])
+		self.assertEqual(
+			(address.address_line1, address.pincode, address.city), ("Dorpstraat 1 B", "1111ZZ", "Utrecht")
+		)
+		self.assertEqual(
+			(address.country, address.address_type, address.bol_buyer), ("Netherlands", "Shipping", 1)
+		)
+		self.assertEqual(
+			[(link.link_doctype, link.link_name) for link in address.links],
+			[("Customer", self.masters.customer)],
+		)
 
 	def test_different_billing_address_is_a_second_address(self):
 		order = self._add("A1")
@@ -190,6 +199,25 @@ class TestImport(OrderImportTestCase):
 		billing = frappe.get_doc("Address", so.customer_address)
 		self.assertEqual((billing.address_title, billing.address_type), ("Borduurwerk B.V.", "Billing"))
 		self.assertEqual(self._buyer_addresses(), 2)
+
+	def test_buyer_details_reach_the_delivery_note_and_invoice(self):
+		order = self._add("A1")
+		order["billingDetails"].update(
+			company="Borduurwerk B.V.", vatNumber="NL999999999B99", kvkNumber="99887766"
+		)
+		buyer = {
+			"bol_buyer_name": "Billie Jansen",
+			"bol_buyer_company": "Borduurwerk B.V.",
+			"bol_buyer_vat_number": "NL999999999B99",
+			"bol_buyer_kvk_number": "99887766",
+		}
+
+		orders.poll_orders()
+
+		so = self._sales_order("A1")
+		self.assertEqual(so.customer, self.masters.customer)
+		for doc in (so, make_delivery_note(so.name), make_sales_invoice(so.name)):
+			self.assertEqual({key: doc.get(key) for key in buyer}, buyer, doc.doctype)
 
 	def test_draft_when_submit_orders_is_off(self):
 		self.settings.submit_orders = 0
@@ -208,7 +236,11 @@ class TestImport(OrderImportTestCase):
 		so = self._sales_order("A1")
 		comments = frappe.get_all(
 			"Comment",
-			filters={"reference_doctype": "Sales Order", "reference_name": so.name, "comment_type": "Comment"},
+			filters={
+				"reference_doctype": "Sales Order",
+				"reference_name": so.name,
+				"comment_type": "Comment",
+			},
 			pluck="content",
 		)
 		self.assertEqual(len(comments), 1)
@@ -319,7 +351,9 @@ class TestFailures(OrderImportTestCase):
 	def test_validation_error_on_submit_rolls_back_everything(self):
 		self._add("A1")
 
-		with patch.object(SalesOrder, "on_submit", side_effect=frappe.ValidationError("Credit limit reached")):
+		with patch.object(
+			SalesOrder, "on_submit", side_effect=frappe.ValidationError("Credit limit reached")
+		):
 			orders.poll_orders()
 
 		self.assertEqual(self._sales_orders("A1"), [])

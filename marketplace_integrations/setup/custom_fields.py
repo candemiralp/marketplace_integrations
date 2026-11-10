@@ -2,6 +2,35 @@
 # Applied by install.ensure_custom_fields on install and on every migrate.
 # Conventions: fieldnames start with `bol_`; bol identifiers are `read_only` and `no_copy`
 # (and `unique` where they are a natural key).
+
+# The party bol's buyer is (all bol orders are booked on one bol customer): what an invoice must name.
+# Not no_copy, so ERPNext's mappers carry them from Sales Order to Delivery Note and Sales Invoice.
+# Buyer PII, like the bol Buyer addresses (cleaned up in story 15).
+BUYER_FIELDS = (
+	("bol_buyer_name", "bol Buyer Name"),
+	("bol_buyer_company", "bol Buyer Company"),
+	("bol_buyer_vat_number", "bol Buyer VAT Number"),
+	("bol_buyer_kvk_number", "bol Buyer KvK Number"),
+)
+
+
+def _buyer_fields(insert_after: str) -> list[dict]:
+	fields = []
+	for fieldname, label in BUYER_FIELDS:
+		fields.append(
+			{
+				"fieldname": fieldname,
+				"fieldtype": "Data",
+				"label": label,
+				"insert_after": insert_after,
+				"read_only": 1,
+				"depends_on": "eval:doc.bol_buyer_name",
+			}
+		)
+		insert_after = fieldname
+	return fields
+
+
 CUSTOM_FIELDS: dict[str, list[dict]] = {
 	# The document a bol call or failure relates to (Ecommerce Integration Log has no such field).
 	"Ecommerce Integration Log": [
@@ -115,7 +144,18 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"read_only": 1,
 			"in_standard_filter": 1,
 		},
+		{
+			"fieldname": "bol_buyer_section",
+			"fieldtype": "Section Break",
+			"label": "bol.com Buyer",
+			"insert_after": "contact_info",
+			"depends_on": "eval:doc.bol_buyer_name",
+		},
+		*_buyer_fields("bol_buyer_section"),
 	],
+	# The Customer's Purchase Order section; the values come from the Sales Order.
+	"Delivery Note": _buyer_fields("po_date"),
+	"Sales Invoice": _buyer_fields("po_date"),
 	# Per line: what shipments (08) and cancellations (10) refer to at bol.
 	"Sales Order Item": [
 		{
