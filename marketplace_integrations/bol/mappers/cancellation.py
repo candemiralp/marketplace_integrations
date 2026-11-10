@@ -53,4 +53,3 @@ def changes(order: dict, rows: dict[str, dict]) -> tuple[dict[str, int], list[st
 def cancellation_body(order_item_id: str, reason_code: str) -> dict:
 	# bol takes exactly one order item per request (maxItems 1) and cancels all of its open units.
 	return {"orderItems": [{"orderItemId": order_item_id, "reasonCode": reason_code}]}
-

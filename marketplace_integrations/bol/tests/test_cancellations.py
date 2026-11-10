@@ -86,14 +86,18 @@ class FakeCancellations:
 	def cancel(self, order_id: str, order_item_id: str, quantity: int | None = None):
 		"""bol cancels (part of) a line: its own decision, the buyer's, or a seller's request."""
 		line = self.line(order_id, order_item_id)
-		line["quantityCancelled"] = quantity if quantity is not None else line["quantity"] - line["quantityShipped"]
+		line["quantityCancelled"] = (
+			quantity if quantity is not None else line["quantity"] - line["quantityShipped"]
+		)
 
 	def finish(self, process_id: str, status: str = "SUCCESS", error_message: str | None = None):
 		order_item_id = self.cancelling[process_id]
 		if status == "SUCCESS":
-			order_id = next(o for o, order in self.orders.items() if any(
-				i["orderItemId"] == order_item_id for i in order["orderItems"]
-			))
+			order_id = next(
+				o
+				for o, order in self.orders.items()
+				if any(i["orderItemId"] == order_item_id for i in order["orderItems"])
+			)
 			self.cancel(order_id, order_item_id)
 		self.processes[process_id].update(status=status, entityId=order_item_id, errorMessage=error_message)
 
@@ -119,7 +123,9 @@ class FakeCancellations:
 
 	def details(self) -> list[str]:
 		return [
-			path.rsplit("/", 1)[1] for method, path, _body in self.calls if method == "GET" and path != orders.PATH
+			path.rsplit("/", 1)[1]
+			for method, path, _body in self.calls
+			if method == "GET" and path != orders.PATH
 		]
 
 
@@ -362,7 +368,9 @@ class TestApply(CancellationTestCase):
 
 		so.reload()
 		self.assertEqual(so.docstatus, 0)
-		self.assertEqual([(row.item_code, row.qty, row.bol_qty_cancelled) for row in so.items], [(SHIRT, 1, 1)])
+		self.assertEqual(
+			[(row.item_code, row.qty, row.bol_qty_cancelled) for row in so.items], [(SHIRT, 1, 1)]
+		)
 
 	def test_draft_cancelled_completely_is_deleted(self):
 		order_id, so = self._sales_order(submit=False)
@@ -547,7 +555,9 @@ class TestSellerCancel(CancellationTestCase):
 		order_id, so = self._sales_order()
 		self.bol.cancel(order_id, BAG_ITEM)
 		self.bol.errors[("PUT", cancellations.PATH)] = BolValidationError(
-			"Bad request", None, [{"name": "orderItems[0].orderItemId", "reason": "Order item is already cancelled"}]
+			"Bad request",
+			None,
+			[{"name": "orderItems[0].orderItemId", "reason": "Order item is already cancelled"}],
 		)
 		bag = self._row(so, BAG_ITEM).name
 

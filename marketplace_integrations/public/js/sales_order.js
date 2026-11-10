@@ -80,7 +80,9 @@ function send_cancellation(frm, so_details, reason_code) {
 			}
 			if (result.sent && result.sent.length) {
 				frappe.show_alert({
-					message: __("Sent to bol. The Sales Order is adjusted when bol has cancelled the lines."),
+					message: __(
+						"Sent to bol. The Sales Order is adjusted when bol has cancelled the lines."
+					),
 					indicator: "blue",
 				});
 			}
