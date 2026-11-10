@@ -13,6 +13,9 @@
   "client_secret",
   "company",
   "offers_section",
+  "sync_offers",
+  "price_list",
+  "offers_column",
   "default_min_days",
   "default_max_days"
  ],
@@ -67,6 +70,25 @@
    "label": "Offers"
   },
   {
+   "default": "0",
+   "description": "Keep bol offers in line with Items: price, delivery promise, economic operator and on-hold state.",
+   "fieldname": "sync_offers",
+   "fieldtype": "Check",
+   "label": "Sync Offers"
+  },
+  {
+   "description": "Selling price list in EUR with prices including VAT. Its Item Prices are the bol prices.",
+   "fieldname": "price_list",
+   "fieldtype": "Link",
+   "label": "Price List",
+   "mandatory_depends_on": "eval:doc.sync_offers",
+   "options": "Price List"
+  },
+  {
+   "fieldname": "offers_column",
+   "fieldtype": "Column Break"
+  },
+  {
    "description": "Delivery promise for items that don't set their own (bol Min Days on the Item).",
    "fieldname": "default_min_days",
    "fieldtype": "Int",
@@ -83,7 +105,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-10 15:53:34.259542",
+ "modified": "2026-11-10 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",

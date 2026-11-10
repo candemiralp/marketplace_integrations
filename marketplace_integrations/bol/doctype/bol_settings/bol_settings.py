@@ -14,6 +14,7 @@ from marketplace_integrations.bol.offers import enqueue_adoption
 from marketplace_integrations.bol.permissions import check_bol_role
 
 REQUIRED_WHEN_ENABLED = ("client_id", "client_secret", "company")
+BOL_CURRENCY = "EUR"
 
 
 class BolSettings(Document):
@@ -21,6 +22,7 @@ class BolSettings(Document):
 
 	def validate(self):
 		self.validate_delivery_days()
+		self.validate_offer_sync()
 		if not self.enabled:
 			return
 		missing = [_(self.meta.get_label(field)) for field in REQUIRED_WHEN_ENABLED if not self.get(field)]
@@ -39,6 +41,30 @@ class BolSettings(Document):
 				_(
 					"Default Min Days to Customer ({0}) can't be more than Default Max Days to Customer ({1})."
 				).format(min_days, max_days)
+			)
+
+	def validate_offer_sync(self):
+		if not self.sync_offers:
+			return
+		if not cint(self.default_max_days):
+			# Otherwise items without their own days would promise delivery on the day of the order.
+			frappe.throw(
+				_("Set Default Max Days to Customer before switching on Sync Offers."),
+				title=_("Missing Settings"),
+			)
+		if not self.price_list:
+			frappe.throw(_("Set a Price List before switching on Sync Offers."), title=_("Missing Settings"))
+		selling, currency = frappe.db.get_value("Price List", self.price_list, ["selling", "currency"]) or (
+			None,
+			None,
+		)
+		if not selling:
+			frappe.throw(_("Price List {0} isn't a selling price list.").format(self.price_list))
+		if currency != BOL_CURRENCY:
+			frappe.throw(
+				_("bol sells in {0}, but Price List {1} is in {2}.").format(
+					BOL_CURRENCY, self.price_list, currency
+				)
 			)
 
 	def on_update(self):
