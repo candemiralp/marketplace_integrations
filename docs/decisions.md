@@ -699,3 +699,31 @@ don't agree with each other anyway. In Demo the list is read without a period an
 requests: `state=OPEN` answers two canned requests (shipments `987654`, `665578`, unknown here → logged);
 `state=UPLOAD_ERROR` is a 400, so Demo reads OPEN only. No upload was sent from here. The flows are covered by tests
 against an in-memory fake of the endpoints.
+
+---
+
+## ADR-016 — New products via bol's Excel bulk upload, not the Product Content API (replaces story 14)
+
+**Context.** Story 14 (Product Content API) was built (content per variant, families, generated drafts, bulk
+approval) and then **dropped by the owner on 2026-11-11** without merging. For ~150 variants it's a one-off catalogue
+load, and bol's seller dashboard (*Items → Add items in bulk*, option 2 for items not yet on bol) does the same work:
+any Excel with column names in row 1 (first tab only, unique names), EAN/title/description linked to bol's fields,
+category predicted per set of similar items, other columns matched to bol attributes by name (e.g. colour ↔ kleur),
+mandatory fields marked red with live value checks, Dutch required to create an item. Keeping the API feature would
+have meant refreshing bol's data model, following API changes, and an upload-ID assumption that the demo couldn't
+confirm.
+
+**Decisions.**
+- Script Report **bol Bulk Upload Export** (ref Item; System Manager, Bol Manager) previews the rows;
+  `bulk_export.download` writes the `.xlsx` with openpyxl. Frappe's own report export can't be used: `make_xlsx` runs
+  every text cell through `handle_html`, which flattens HTML descriptions.
+- Rows: every enabled Item that isn't a template; Items without a valid EAN (`mappers.ean.get_item_ean`) are listed
+  as left out. *Only items not on bol yet* (default on) leaves out Items mapped to a bol offer (`Ecommerce Item`,
+  integration Bol). Variants take the template's description, brand and image when they have none of their own;
+  ERPNext fills an empty description with the Item Name, which counts as none.
+- Columns use English names close to bol's attribute names, so bol's matcher can suggest them; one column per
+  variant attribute (Item Variant Attribute). `Family Key` = the template's item code, for grouping variants.
+- Descriptions are cleaned with `bleach` to bol's tags (`b br h3 li ol ul p strong`), no attributes; script/style
+  content dropped (Frappe's `clean_script_and_style`).
+- Texts aren't translated: Shopify's are English, and the owner translates in the file before uploading. Prices and
+  stock aren't exported: offers stay with the offer sync (story 05).
