@@ -719,11 +719,12 @@ confirm.
   every text cell through `handle_html`, which flattens HTML descriptions.
 - Rows: every enabled Item that isn't a template; Items without a valid EAN (`mappers.ean.get_item_ean`) are listed
   as left out. *Only items not on bol yet* (default on) leaves out Items mapped to a bol offer (`Ecommerce Item`,
-  integration Bol). Variants take the template's description, brand and image when they have none of their own;
+  integration Bol). Variants take the template's description and brand when they have none of their own;
   ERPNext fills an empty description with the Item Name, which counts as none.
 - Columns use English names close to bol's attribute names, so bol's matcher can suggest them; one column per
   variant attribute (Item Variant Attribute). `Family Key` = the template's item code, for grouping variants.
 - Descriptions are cleaned with `bleach` to bol's tags (`b br h3 li ol ul p strong`), no attributes; script/style
   content dropped (Frappe's `clean_script_and_style`).
+- No image URL column (owner decision, 2026-11-11): images are added in bol's tool.
 - Texts aren't translated: Shopify's are English, and the owner translates in the file before uploading. Prices and
   stock aren't exported: offers stay with the offer sync (story 05).

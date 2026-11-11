@@ -8,7 +8,7 @@ from io import BytesIO
 import bleach
 import frappe
 from frappe import _
-from frappe.utils import cint, get_url, strip_html
+from frappe.utils import cint, strip_html
 from frappe.utils.html_utils import clean_script_and_style
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -28,10 +28,7 @@ LEADING_COLUMNS = (
 	# bol groups variants that share it; the template's item code.
 	("family_key", "Family Key", 180),
 )
-TRAILING_COLUMNS = (
-	("image_url", "Image URL", 280),
-	("item_group", "Item Group", 160),
-)
+TRAILING_COLUMNS = (("item_group", "Item Group", 160),)
 # The HTML bol accepts in a description.
 DESCRIPTION_TAGS = frozenset({"b", "br", "h3", "li", "ol", "ul", "p", "strong"})
 FILE_NAME = "bol-bulk-upload.xlsx"
@@ -45,7 +42,7 @@ def export(filters: dict) -> dict:
 	items = frappe.get_all(
 		"Item",
 		filters=_item_filters(filters),
-		fields=["name", "item_name", "description", "brand", "item_group", "image", "variant_of"],
+		fields=["name", "item_name", "description", "brand", "item_group", "variant_of"],
 		order_by="variant_of asc, name asc",
 	)
 	if cint(filters.only_new):
@@ -73,7 +70,6 @@ def export(filters: dict) -> dict:
 				"internal_reference": item.name,
 				"family_key": item.variant_of,
 				**{_attribute_field(name): value for name, value in attributes.get(item.name, {}).items()},
-				"image_url": _absolute(item.image or template.get("image")),
 				"item_group": item.item_group,
 			}
 		)
@@ -173,7 +169,7 @@ def _templates(names: set[str]) -> dict:
 	if not names:
 		return {}
 	rows = frappe.get_all(
-		"Item", filters={"name": ("in", list(names))}, fields=["name", "description", "brand", "image"]
+		"Item", filters={"name": ("in", list(names))}, fields=["name", "description", "brand"]
 	)
 	return {row.name: row for row in rows}
 
@@ -215,10 +211,3 @@ def _own_description(item) -> str | None:
 
 def _attribute_field(name: str) -> str:
 	return f"attribute_{frappe.scrub(name)}"
-
-
-def _absolute(path: str | None) -> str | None:
-	# Shopify's image URLs are absolute already; ERPNext files are made so.
-	if not path:
-		return None
-	return get_url(path) if path.startswith("/") else path
