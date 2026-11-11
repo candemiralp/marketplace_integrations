@@ -23,7 +23,6 @@ SIZES = {"116": "8712345670146", "128": "8712345670153"}
 PLAIN, PLAIN_EAN = "_Test bol export bag", "8712345670160"
 NO_EAN = "_Test bol export cap"
 ON_BOL, ON_BOL_EAN = "_Test bol export bib", "8712345670177"
-SHOPIFY_IMAGE = "https://cdn.shopify.com/s/files/1/0001/shirt.jpg"
 DESCRIPTION = (
 	'<div class="x"><p style="color:red">Soft <em>cotton</em>, with your <strong>name</strong>.</p>'
 	"<ul><li>Washable</li></ul><script>alert(1)</script></div>"
@@ -49,7 +48,6 @@ class TestBulkExport(FrappeTestCase):
 			has_variants=1,
 			attributes=[{"attribute": SIZE}],
 			description=DESCRIPTION,
-			image=SHOPIFY_IMAGE,
 		)
 		for size, ean in SIZES.items():
 			variant = create_variant(TEMPLATE, {SIZE: size})
@@ -57,7 +55,7 @@ class TestBulkExport(FrappeTestCase):
 			variant.description = None
 			variant.append("barcodes", {"barcode": ean, "barcode_type": "EAN"})
 			variant.insert()
-		make_item(PLAIN, PLAIN_EAN, description="Canvas bag", image="/files/bag.jpg", bol_enabled=0)
+		make_item(PLAIN, PLAIN_EAN, description="Canvas bag", bol_enabled=0)
 		make_item(NO_EAN)
 		make_item(ON_BOL, ON_BOL_EAN)
 		frappe.get_doc(
@@ -83,15 +81,15 @@ class TestBulkExport(FrappeTestCase):
 		self.assertEqual(variant["ean"], SIZES["116"])
 		self.assertEqual(variant["family_key"], TEMPLATE)
 		self.assertEqual(variant["attribute__test_bol_export_size"], "116")
-		# Variants take the template's description, brand and image when they have none.
+		# Variants take the template's description and brand when they have none.
 		self.assertEqual(
 			variant["description"],
 			"<p>Soft cotton, with your <strong>name</strong>.</p><ul><li>Washable</li></ul>",
 		)
-		self.assertEqual((variant["brand"], variant["image_url"]), (TEST_BRAND, SHOPIFY_IMAGE))
+		self.assertEqual(variant["brand"], TEST_BRAND)
+		self.assertNotIn("image_url", variant)
 		plain = result["rows"][0]
 		self.assertIsNone(plain["family_key"])
-		self.assertEqual(plain["image_url"], frappe.utils.get_url("/files/bag.jpg"))
 
 	def test_a_variants_own_description_wins(self):
 		frappe.db.set_value("Item", f"{TEMPLATE}-128", "description", "<p>Size 128: <b>longer</b> fit</p>")
@@ -126,7 +124,6 @@ class TestBulkExport(FrappeTestCase):
 				"Internal Reference",
 				"Family Key",
 				SIZE,
-				"Image URL",
 				"Item Group",
 			],
 		)
@@ -136,7 +133,7 @@ class TestBulkExport(FrappeTestCase):
 	def test_report(self):
 		columns, rows, message = execute({"item_group": TEST_ITEM_GROUP, "only_new": 1})
 		self.assertEqual(len(rows), 3)
-		self.assertEqual(len(columns), 9)
+		self.assertEqual(len(columns), 8)
 		self.assertIn(NO_EAN, message)
 
 	def test_xlsx(self):

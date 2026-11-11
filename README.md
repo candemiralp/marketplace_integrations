@@ -346,8 +346,8 @@ makes. There's no content upload through the API (story 14 was dropped).
 2. It lists every product that isn't a template: one row per variant, with **EAN**, **Title** (*Item Name*),
    **Description** (cleaned to the HTML bol accepts: `b br h3 li ol ul p strong`), **Brand**, **Internal Reference**
    (item code), **Family Key** (the template, so variants can be grouped), one column per variant attribute (*Size*,
-   *Colour*, …), **Image URL** (Shopify's CDN URL) and **Item Group**. A variant without its own description, brand or
-   image takes its template's. Items without a valid EAN barcode are left out and named above the table.
+   *Colour*, …) and **Item Group**. A variant without its own description or brand takes its template's. Images
+   aren't in the file: add them in bol's tool. Items without a valid EAN barcode are left out and named above the table.
 3. Click **Download for bol** (not the standard *Export*, which turns descriptions into flat text). The file has one
    tab and the column names in row 1, as bol requires.
 4. **Translate** Title and Description into Dutch in the file: bol creates new items only from Dutch content. Then
