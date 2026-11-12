@@ -109,7 +109,7 @@ class TestListEconomicOperators(EconomicOperatorTestCase):
 			operators,
 			[
 				{"id": "5d6e7f80-a80c-48b7-a03e-d5939f1173fb", "name": "Atelier Import", "status": "PENDING"},
-				{"id": OPERATOR_ID, "name": "Magnatlas B.V.", "status": "VALID"},
+				{"id": OPERATOR_ID, "name": "Test Company B.V.", "status": "VALID"},
 			],
 		)
 		self.client.request.assert_called_once_with(

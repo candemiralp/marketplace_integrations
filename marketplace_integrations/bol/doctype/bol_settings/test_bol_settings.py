@@ -1,4 +1,4 @@
-# Copyright (c) 2026, Magnatlas and Contributors
+# Copyright (c) 2026, Can Demiralp and Contributors
 # See license.txt
 
 from unittest.mock import patch

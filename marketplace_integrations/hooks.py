@@ -1,6 +1,6 @@
 app_name = "marketplace_integrations"
 app_title = "Marketplace Integrations"
-app_publisher = "Magnatlas"
+app_publisher = "Can Demiralp"
 app_description = "Integrates with marketplaces"
 app_email = "github@candemiralp.com"
 app_license = "mit"

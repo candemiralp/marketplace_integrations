@@ -1,4 +1,4 @@
-// Copyright (c) 2026, Magnatlas and contributors
+// Copyright (c) 2026, Can Demiralp and contributors
 // For license information, please see license.txt
 
 // The file for bol's seller dashboard: Items → Add items in bulk. Use Download for bol, not Export: the standard
