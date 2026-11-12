@@ -1,0 +1,55 @@
+<p>{{ _("The bol.com integration has things that need a person. Details are in the linked documents.") }}</p>
+
+<table cellpadding="4" style="border-collapse: collapse">
+	{% for count in counts %}
+	<tr>
+		<td style="text-align: right"><strong>{{ count.value }}</strong></td>
+		<td>
+			{% if count.value %}<a href="{{ count.url }}">{{ count.label | e }}</a>{% else %}{{ count.label | e }}{% endif %}
+		</td>
+	</tr>
+	{% endfor %}
+</table>
+
+{% if stuck_orders %}
+<h3>{{ _("Orders not imported for more than 24 hours") }}</h3>
+<ul>
+	{% for order in stuck_orders %}
+	<li>
+		{{ _("bol order {0}, failing since {1}").format(order.order_id | e, order.since) }}:
+		<a href="{{ order.url }}">{{ _("latest error") }}</a>
+	</li>
+	{% endfor %}
+</ul>
+{% if stuck_more %}<p><a href="{{ log_url }}">{{ _("And {0} more").format(stuck_more) }}</a></p>{% endif %}
+{% endif %}
+
+{% if shipments.rows %}
+<h3>{{ _("Shipments to check") }}</h3>
+<ul>
+	{% for row in shipments.rows %}
+	<li>
+		<a href="{{ row.url }}">{{ row.name | e }}</a>: {{ row.status | e }}{% if row.order_id %}
+		({{ _("bol order {0}").format(row.order_id | e) }}){% endif %}
+	</li>
+	{% endfor %}
+</ul>
+{% if shipments.more_url %}<p><a href="{{ shipments.more_url }}">{{ _("More") }}</a></p>{% endif %}
+{% endif %}
+
+{% if offers.rows %}
+<h3>{{ _("Offers not for sale") }}</h3>
+<ul>
+	{% for row in offers.rows %}
+	<li>
+		<a href="{{ row.url }}">{{ row.name | e }}</a>: {{ row.status | e }}{% if row.detail %} ({{ row.detail | e }}){% endif %}
+	</li>
+	{% endfor %}
+</ul>
+{% if offers.more_url %}<p><a href="{{ offers.more_url }}">{{ _("More") }}</a></p>{% endif %}
+{% endif %}
+
+<p style="color: #888">
+	{{ _("Sent every morning by the bol.com integration, only when there is something to check.") }}
+	<a href="{{ settings_url }}">{{ _("Bol Settings") }}</a>
+</p>

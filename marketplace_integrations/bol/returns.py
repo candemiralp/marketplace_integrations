@@ -45,7 +45,8 @@ OPEN, REPORTED, FAILED = "Open", "Reported", "Failed"
 UNFINISHED = ("PENDING", "HANDLER_ERROR")
 # A report bol couldn't take is sent again by the returns poll once things had time to settle.
 SWEEP_AFTER_MINUTES = 10
-SWEEP_BATCH = 50
+# bol limits PUT /retailer/returns/{rma} to 20 a minute (story 15).
+SWEEP_BATCH = 20
 # Failures a later attempt may not have: the return stays Open and the sweep reports it again.
 PASSING = (BolTransientError, BolRateLimitError, BolServerError)
 

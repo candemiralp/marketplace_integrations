@@ -34,7 +34,8 @@ Retailer API. Voor verkopers op bol.com in Nederland en België die zelf verzend
   (commission, labels) as draft Purchase Invoices, and invoice requests from business buyers
   uploaded automatically.
 - **New products**: an export for bol.com's bulk upload of items not yet on bol.com.
-- **Reliable by design**: idempotent imports, safe retries, and every failure in the integration log.
+- **Reliable by design**: idempotent imports, safe retries, every failure in the integration log, and a daily
+  e-mail to the people who run it when something needs a look.
 
 The app builds on `ecommerce_integrations` and reuses its `Ecommerce Item` and
 `Ecommerce Integration Log`.
@@ -69,6 +70,8 @@ How to use and operate the integration, in the order you set it up:
 10. [Returns](docs/usage/10-returns.md)
 11. [Accounting](docs/usage/11-accounting.md)
 12. [New products: bulk upload export](docs/usage/12-bulk-upload-export.md)
+13. [Monitoring and privacy](docs/usage/14-monitoring.md): the Bol workspace, the daily digest, buyer address cleanup
+14. [Cutover and release checks](docs/usage/15-cutover.md): demo smoke test, go-live, order comparison, hardening
 
 For developers: [using the bol client and process tracker](docs/usage/13-developers.md).
 Design and engineering standards: [`docs/stories/00-overview.md`](docs/stories/00-overview.md).

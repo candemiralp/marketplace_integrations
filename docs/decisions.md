@@ -728,3 +728,57 @@ confirm.
 - No image URL column (owner decision, 2026-11-11): images are added in bol's tool.
 - Texts aren't translated: Shopify's are English, and the owner translates in the file before uploading. Prices and
   stock aren't exported: offers stay with the offer sync (story 05).
+
+---
+
+## ADR-017 — Cutover, monitoring, hardening (story 15)
+
+**Context.** Checked on 2026-11-12 against `docs/bol-openapi/retailer-api-v10.json` (Orders list), bol's
+*Rate limiting* page and its active limits (`https://api.bol.com/retailer/public/ratelimits`), Frappe 15.126.1 and
+ERPNext 15.124.5. Story 13 (webhooks) isn't built; story 14 was dropped (ADR-016).
+
+| Story says | Spec / Frappe / ERPNext say | Decision |
+|---|---|---|
+| Number cards: log errors 24h, processes PENDING > 1h **or** HANDLER_ERROR, … | A *Document Type* card takes AND filters only, and a relative time only as a client-side JS expression | All five are **Custom** cards (`monitoring.*_card`, role-checked) over one count function each, which the digest uses too. Each returns a route with the list's filters (the process card's list shows every unfinished process). `document_type` is set because Frappe uses it for card permissions. |
+| Workspace JSON in the module | Workspace and Number Card are synced from `bol/workspace/` and `bol/number_card/` on migrate | Written in Frappe's export format; module Bol, roles System Manager + Bol Manager. |
+| Stuck orders: "import failing for more than 24h" | A failed import leaves no document, only `log_once("order", id)` entries, one per 6 h while the poll still meets it. Their `method` is `GET /retailer/orders/{id}` (bol failed) or `import_order /retailer/orders/{id}` (mapping/ERPNext failed) | Stuck = Error logs of the last 7 days for that path: first > 24 h old, latest < 7 h old (still failing), and no Sales Order with that `bol_order_id`. No new DocType or field. |
+| Digest at 07:30 Amsterdam | Frappe evaluates cron in the **system time zone** | `30 7 * * *`; the usage doc requires System Settings = Europe/Amsterdam. |
+| Webhook silence (13) | Story 13 not built | Left out; add it with story 13. |
+| No PII in the digest | Error messages can quote ERPNext validation text naming the buyer | The digest shows ids, statuses, bol's not-for-sale reasons and links only, never a log message. |
+| Health datetimes on Bol Settings | `set_single_value` updates `modified` by default; an open settings form would then say "document modified" every 5 minutes | Written with `update_modified=False` at the end of a run whose bol list call succeeded (`last_order_poll`, `last_stock_reconcile`, `last_invoice_import`). |
+| Orders compare for the first 7 days | `GET /retailer/orders?status=ALL&latest-change-date=` filters on the day an order item last changed, up to 3 months back. The date format isn't specified (string): **verify** `YYYY-MM-DD` on production | `smoke.compare_orders` reads every day from the cutover to today and keeps orders placed in the window. The demo answers only its canned page 1. |
+| Anonymize "Addresses linked only to documents older than N days" | ERPNext names an Address `<buyer name>-<type>`. `SellingController.set_customer_address` re-renders `address_display` from the Address on **every validate** | **Owner decision: rename too** (`bol-buyer-#####`, `frappe.rename_doc`, so SO/DN/SI links follow). Only when every SO/DN/SI using it is older than N days, none is a draft, SOs are Completed/Closed/Cancelled and DNs Completed/Closed/Return Issued, so nothing will print it again. Its Versions and Comments (incl. "renamed from <old name>") and the old global-search row are deleted. Fields set with `db.set_value` (no validation); e-mail/phone/fax emptied, not "[removed]", which would fail validation on the next save. |
+
+**Decisions.**
+- **Recipients**: enabled System Users with Bol Manager (not Administrator); none → *Notify User*; neither →
+  `log_once("digest", "recipients")`, which shows on the errors card. Sent only while *Enabled* is on and something is
+  to report. Lists capped at 20 with a link to the filtered list.
+- **Smoke run** refuses anything but Demo and uses `BolClient(settings)` directly, so it runs with the integration
+  disabled. The demo's canned ids (order item 2095052647) are used for the shipment and label steps.
+- **Retention** runs daily under *Enabled*, at most 200 addresses per run (addresses still in use don't count toward
+  it). One savepoint and commit per address; a failure is rolled back and logged once per 6 h.
+- **Rate limits** (active limits page): the tight ones are `GET /retailer/shipments` **25/min** (every confirmation
+  reconciles with it, ADR-011) and `PUT /retailer/returns/*` **20/min**. Both sweeps now queue at most **20** jobs
+  (were 50). A burst of more than ~25 bol Delivery Notes submitted in one minute still meets 429s; the client honours
+  `Retry-After`, and what doesn't get through stays *Pending* for the next sweep. The table is in `docs/usage/15-cutover.md`.
+- **Permissions review**: Bol Manager keeps create/read/write/print on Bol Settings; **delete, share and e-mail were
+  removed** (share could hand the settings to a user without the role). Bol Process read/report/export, integration
+  log read (Custom DocPerm, ADR-005), the bulk upload report, the workspace. Every whitelisted action checks the role
+  and the document permission. No `allow_guest` endpoint.
+- **Uninstall**: Frappe deletes the module's DocTypes, workspace, cards, report and print format, plus every record
+  linking to Module Def `Bol` (our integration log entries and Ecommerce Item rows). Custom fields and their data stay;
+  without hooks they do nothing. No `before_uninstall`.
+
+**Checked live (`dev.localhost`, Demo).** `smoke.run`: all seven steps PASS (1 offer, 4 open orders, the canned
+shipment process stays PENDING, 2 delivery options, 1 return, 1 invoice). `compare_orders` over the demo's dates:
+`1042831430` imported; the other three demo orders are reported *missing* because every unit was shipped before they
+were seen (ADR-010). On production that would be a real anomaly after the cutover, so they aren't filtered out.
+`uninstall-app --dry-run`: 3 DocTypes, the workspace, 5 cards, the report, the print format, the Module Def, plus
+428 integration log entries and 1 Ecommerce Item. No custom fields. Migrate twice: no changes, no errors.
+
+**Open for the owner / accountant.**
+- N for the address cleanup, and whether its scope should grow: the `bol_buyer_*` fields and the SO/DN copies of the
+  address (`address_display`, `shipping_address`) are left as they are (outside the story). Error entries in the
+  integration log keep order payloads (ecommerce_integrations purges only Success logs after 90 days).
+- A return Delivery Note or credit note made after the address was anonymized prints `[removed]`: choose N well past
+  bol's return window.

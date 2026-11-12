@@ -34,7 +34,8 @@ RETAILER = "RETAILER"
 UNFINISHED = ("PENDING", "HANDLER_ERROR")
 # bol couldn't be reached, or may have got the POST: tried again once things had time to settle.
 SWEEP_AFTER_MINUTES = 10
-SWEEP_BATCH = 50
+# Each confirmation first reads GET /retailer/shipments, which bol limits to 25 a minute (story 15).
+SWEEP_BATCH = 20
 # Failures a later attempt may not have: the Delivery Note stays Pending and the sweep retries it.
 PASSING = (BolTransientError, BolRateLimitError, BolServerError)
 

@@ -11,7 +11,7 @@ from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_invoice
 from frappe import _
 from frappe.utils import add_days, get_system_timezone, getdate, today
 
-from marketplace_integrations.bol import process_status, returns, shipments
+from marketplace_integrations.bol import monitoring, process_status, returns, shipments
 from marketplace_integrations.bol.api.client import get_client
 from marketplace_integrations.bol.api.errors import BolError, BolMappingError, BolNotFoundError
 from marketplace_integrations.bol.log import add_comment, log_call, log_once
@@ -317,6 +317,7 @@ def poll_bol_invoices():
 		# One invoice per transaction (overview §4.1 rule 4).
 		frappe.db.commit()  # nosemgrep
 	frappe.db.set_single_value("Bol Settings", "bol_invoices_until", end if all_done else anchor)
+	monitoring.mark_run("last_invoice_import")
 
 
 def listed_invoices(client, start, end) -> list[dict]:

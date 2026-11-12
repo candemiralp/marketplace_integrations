@@ -55,7 +55,14 @@
   "default_expense_account",
   "bol_invoices_until",
   "invoice_account_section",
-  "invoice_account_map"
+  "invoice_account_map",
+  "health_section",
+  "last_order_poll",
+  "last_stock_reconcile",
+  "health_column",
+  "last_invoice_import",
+  "privacy_section",
+  "anonymize_buyer_addresses_after_days"
  ],
  "fields": [
   {
@@ -387,13 +394,60 @@
    "fieldtype": "Table",
    "label": "Invoice Account Map",
    "options": "Bol Invoice Account Map"
+  },
+  {
+   "description": "Written by the background jobs each time they finish. A time far in the past means the job isn't running or keeps failing: see the integration log.",
+   "fieldname": "health_section",
+   "fieldtype": "Section Break",
+   "label": "Health"
+  },
+  {
+   "description": "Last run of the 5-minute order import that read bol's order list.",
+   "fieldname": "last_order_poll",
+   "fieldtype": "Datetime",
+   "label": "Last Order Poll",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "Last nightly stock reconcile that read every bol offer.",
+   "fieldname": "last_stock_reconcile",
+   "fieldtype": "Datetime",
+   "label": "Last Stock Reconcile",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "health_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Last daily bol invoice import that read bol's invoice list.",
+   "fieldname": "last_invoice_import",
+   "fieldtype": "Datetime",
+   "label": "Last Invoice Import",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "privacy_section",
+   "fieldtype": "Section Break",
+   "label": "Privacy"
+  },
+  {
+   "default": "0",
+   "description": "Daily: replace the personal fields of bol buyer addresses with \"[removed]\" (country and postcode are kept) once every Sales Order, Delivery Note and Sales Invoice using them is older than this many days and finished. Printed addresses on Sales Invoices are kept. 0 = off. Agree the number of days with your accountant and check bol's partner terms first.",
+   "fieldname": "anonymize_buyer_addresses_after_days",
+   "fieldtype": "Int",
+   "label": "Anonymize Buyer Addresses After (Days)",
+   "non_negative": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-11 00:20:33.661371",
+ "modified": "2026-11-12 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",
@@ -411,12 +465,9 @@
   },
   {
    "create": 1,
-   "delete": 1,
-   "email": 1,
    "print": 1,
    "read": 1,
    "role": "Bol Manager",
-   "share": 1,
    "write": 1
   }
  ],
