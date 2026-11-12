@@ -195,7 +195,7 @@ Rules:
 - [ ] `ruff`, `ruff format`, semgrep clean
 - [ ] `bench migrate` on an existing site is idempotent (run it twice)
 - [ ] Feature toggle defaults to **off**; enabling it is the only thing needed to activate it
-- [ ] Short "How to use / operate" section added to `README.md`
+- [ ] Short "How to use / operate" page added to `docs/usage/` and linked from `README.md`
 
 ## 6. Story map
 
