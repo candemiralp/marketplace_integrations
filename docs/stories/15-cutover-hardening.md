@@ -1,7 +1,6 @@
 # 15 — Cutover, monitoring, hardening
 
-**Goal:** switch bol.com from the Shopify↔bol app to the direct ERPNext
-integration with no lost or duplicated orders. Make sure failures get noticed
+**Goal:** Make sure failures get noticed
 without anyone having to watch the logs.
 **Depends on:** all required stories
 
@@ -37,26 +36,7 @@ every release. It's not part of the unit test suite.
   Confirm N and the scope with your accountant and check bol's partner terms
   before turning this on. Record the decision in `docs/decisions.md`.
 
-## D. Cutover runbook (write it into `docs/cutover.md`)
-1. **T-7d:** run story 04 **Adopt existing offers** on production with
-   `sync_offers` / `sync_stock` off. Resolve every unmatched or ambiguous EAN.
-   Link economic operators. Set the price list so bol prices equal the current bol prices.
-2. **T-1d:** turn on `sync_offers` + `sync_stock`, but first disable stock and
-   price pushes in the Shopify↔bol app. Watch the nightly reconcile: the target is
-   0 corrections.
-3. **T-0 (quiet hour):**
-   a. In the Shopify↔bol app: turn off order import into Shopify.
-   b. Set `import_orders_placed_after = now` and turn on `import_orders`,
-      `push_shipments`, `use_vvb`, `handle_returns`, `auto_invoice`.
-   c. Orders already in Shopify/ERPNext from the old flow are finished in the
-      old flow: ship them from Shopify as before.
-   d. Watch the first poll; place a real low-value test order if possible.
-4. **T+7d:** if nothing is open in the old flow, uninstall the Shopify↔bol app
-   and the Shopify PostNL app for bol orders. Turn on `import_bol_invoices`.
-5. **Rollback:** turn off the toggles from 3b, turn the Shopify↔bol app's order
-   import back on. Orders imported in the meantime stay in ERPNext and are shipped from there.
-
-## E. Hardening checklist
+## D. Hardening checklist
 - [ ] Every scheduler job deduplicated (`job_id`) and guarded by toggles
 - [ ] Rate-limit sanity: count the calls per poll cycle at peak volume; stay well below bol's limits
 - [ ] Permissions review: Bol Manager can't read anything beyond what it needs; integration logs are restricted
