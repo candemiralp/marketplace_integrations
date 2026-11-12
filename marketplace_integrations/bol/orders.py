@@ -6,7 +6,7 @@ from erpnext.controllers.accounts_controller import get_taxes_and_charges
 from frappe import _
 from frappe.utils import get_datetime, get_system_timezone, now_datetime
 
-from marketplace_integrations.bol import cancellations, offers
+from marketplace_integrations.bol import cancellations, monitoring, offers
 from marketplace_integrations.bol.api.client import get_client
 from marketplace_integrations.bol.api.errors import BolError
 from marketplace_integrations.bol.log import log_once
@@ -55,6 +55,7 @@ def poll_orders():
 	cancellations.sync_existing_order_changes(
 		[order for order in open_list if order["orderId"] in existing], client
 	)
+	monitoring.mark_run("last_order_poll")
 
 
 def open_orders(client) -> list[dict]:

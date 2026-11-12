@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, get_datetime, now
 
-from marketplace_integrations.bol import offers
+from marketplace_integrations.bol import monitoring, offers
 from marketplace_integrations.bol.api.client import get_client
 from marketplace_integrations.bol.api.errors import BolError, BolNotFoundError
 from marketplace_integrations.bol.log import INTEGRATION, add_comment, log_call, log_once
@@ -176,6 +176,7 @@ def reconcile_stock() -> dict | None:
 		_report(counts, e)
 		raise
 	_report(counts)
+	monitoring.mark_run("last_stock_reconcile")
 	return counts
 
 

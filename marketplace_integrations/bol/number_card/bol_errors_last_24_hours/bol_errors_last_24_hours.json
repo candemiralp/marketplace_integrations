@@ -1,0 +1,20 @@
+{
+ "color": "#ff5858",
+ "creation": "2026-11-12 09:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Ecommerce Integration Log",
+ "filters_json": "[]",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "bol Errors Last 24 Hours",
+ "method": "marketplace_integrations.bol.monitoring.log_errors_card",
+ "modified": "2026-11-12 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bol",
+ "name": "bol Errors Last 24 Hours",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "type": "Custom"
+}

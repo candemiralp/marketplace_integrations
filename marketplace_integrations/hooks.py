@@ -223,6 +223,8 @@ scheduler_events = {
 		"*/30 * * * *": ["marketplace_integrations.bol.returns.poll_returns"],
 		# Early morning, after the daily offer reconcile has re-queued offers missing at bol.
 		"0 5 * * *": ["marketplace_integrations.bol.stock.reconcile_stock"],
+		# Cron runs in the system time zone (Europe/Amsterdam): before the working day starts.
+		"30 7 * * *": ["marketplace_integrations.bol.monitoring.send_daily_digest"],
 	},
 	"daily": [
 		"marketplace_integrations.bol.process_status.delete_old_processes",
@@ -231,6 +233,7 @@ scheduler_events = {
 		"marketplace_integrations.bol.invoices.sweep_sales_invoices",
 		"marketplace_integrations.bol.invoices.poll_bol_invoices",
 		"marketplace_integrations.bol.invoices.upload_requested_invoices",
+		"marketplace_integrations.bol.retention.anonymize_buyer_addresses",
 	],
 }
 
