@@ -73,9 +73,8 @@ How to use and operate the integration, in the order you set it up:
 13. [Monitoring and privacy](docs/usage/14-monitoring.md): the Bol workspace, the daily digest, buyer address cleanup
 14. [Cutover and release checks](docs/usage/15-cutover.md): demo smoke test, go-live, order comparison, hardening
 
-For developers: [using the bol client and process tracker](docs/usage/13-developers.md).
-Design and engineering standards: [`docs/stories/00-overview.md`](docs/stories/00-overview.md).
-Decisions and spec differences: [`docs/decisions.md`](docs/decisions.md).
+For developers: [using the bol client and process tracker](docs/usage/13-developers.md) \
+Decisions and spec differences: [`docs/decisions.md`](docs/decisions.md)
 
 ## License
 
