@@ -19,7 +19,7 @@ TZ = "Europe/Amsterdam"
 def context(**overrides) -> dict:
 	return {
 		"customer": "bol.com",
-		"company": "Magnatlas",
+		"company": "Test Company",
 		"warehouse": "Stores - MG",
 		"items": {SHIRT_EAN: [SHIRT], BAG_EAN: [BAG]},
 		"countries": {"NL": "Netherlands", "BE": "Belgium", "DE": "Germany"},
@@ -48,7 +48,7 @@ class TestSalesOrder(unittest.TestCase):
 		so = to_sales_order(order(), context())["sales_order"]
 
 		self.assertEqual(so["customer"], "bol.com")
-		self.assertEqual(so["company"], "Magnatlas")
+		self.assertEqual(so["company"], "Test Company")
 		self.assertEqual(so["bol_order_id"], "A2K8290LP8")
 		self.assertEqual(so["po_no"], "A2K8290LP8")
 		self.assertEqual(so["transaction_date"], "2026-11-09")

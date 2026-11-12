@@ -3,7 +3,7 @@
 		{
 			"id": "0c6573a2-a80c-48b7-a03e-d5939f1173fa",
 			"externalReference": "external-reference",
-			"name": "Magnatlas B.V.",
+			"name": "Test Company B.V.",
 			"address": {"street": "Hoofdstraat", "houseNumber": "1", "postalCode": "1234AB", "city": "Utrecht", "country": "NL"},
 			"contactInformation": {"emailAddress": "eo@example.com", "phoneNumber": "+31301234567"},
 			"status": "VALID"

@@ -1,7 +1,7 @@
 [project]
 name = "marketplace_integrations"
 authors = [
-    { name = "Magnatlas", email = "github@candemiralp.com"}
+    { name = "Can Demiralp", email = "opensource@candemiralp.com"}
 ]
 description = "Integrates with marketplaces"
 requires-python = ">=3.10"
