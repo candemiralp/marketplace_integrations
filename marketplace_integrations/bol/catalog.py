@@ -10,6 +10,7 @@ from marketplace_integrations.bol.api.client import get_client
 from marketplace_integrations.bol.api.errors import BolError, BolMappingError, BolNotFoundError
 from marketplace_integrations.bol.log import log_call
 from marketplace_integrations.bol.mappers.ean import get_item_ean
+from marketplace_integrations.bol.mappers.offer import WITHIN_24_HOURS
 from marketplace_integrations.bol.permissions import check_bol_role
 
 OPERATORS_PATH = "/retailer/economic-operators"
@@ -51,13 +52,8 @@ def _publish_problems(doc) -> list[str]:
 				"Brand {0} has no bol economic operator. Use Select bol economic operator on the Brand."
 			).format(doc.brand)
 		)
-	min_days, max_days = cint(doc.get("bol_min_days")), cint(doc.get("bol_max_days"))
-	if min_days and max_days and min_days > max_days:
-		problems.append(
-			_("bol Min Days to Customer ({0}) can't be more than bol Max Days to Customer ({1}).").format(
-				min_days, max_days
-			)
-		)
+	if doc.get("bol_delivery_time") == WITHIN_24_HOURS and not doc.get("bol_order_before"):
+		problems.append(_("Set bol If Ordered Before for the delivery time {0}.").format(_(WITHIN_24_HOURS)))
 	return problems
 
 

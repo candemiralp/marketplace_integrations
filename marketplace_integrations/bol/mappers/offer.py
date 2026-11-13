@@ -11,6 +11,18 @@ MIN_PRICE, MAX_PRICE = 1, 9999
 REFERENCE_LENGTH = 100
 # The desired state of an offer that must be off sale: nothing else needs to be known for it.
 HOLD = {"onHoldByRetailer": True}
+# The delivery times of bol's own delivery promise, as in the seller dashboard: (min, max) days to the customer.
+WITHIN_24_HOURS = "Within 24 hours"
+DELIVERY_TIMES = {
+	WITHIN_24_HOURS: (0, 1),
+	"1-2 working days": (1, 2),
+	"2-3 working days": (2, 3),
+	"3-5 working days": (3, 5),
+	"4-8 working days": (4, 8),
+	"1-8 working days": (1, 8),
+}
+# The "If ordered before" times of Within 24 hours.
+ORDER_BEFORE_TIMES = tuple(f"{hour}:00" for hour in range(12, 24))
 # What the offer sync owns. `stock` belongs to the stock sync (bol/stock.py); `ean` and `condition` can't be patched.
 PATCHABLE = ("economicOperatorId", "onHoldByRetailer", "reference", "pricing", "fulfilment")
 
@@ -24,12 +36,12 @@ def offer_status(offer: dict) -> str:
 	return NOT_FOR_SALE
 
 
-def build_offer(item: dict, price: float, eo_id: str, min_days: int, max_days: int, stock: int) -> dict:
+def build_offer(
+	item: dict, price: float, eo_id: str, delivery_time: str, order_before: str | None, stock: int
+) -> dict:
 	"""The CreateOfferRequest of a for-sale offer. `item` holds `item_code` and `ean`."""
 	if price is None or not MIN_PRICE <= price <= MAX_PRICE:
 		raise BolMappingError(f"Price {price} is outside {MIN_PRICE}–{MAX_PRICE}", reason="price_range")
-	if min_days > max_days:
-		raise BolMappingError(f"Min days {min_days} > max days {max_days}", reason="delivery_days")
 	return {
 		"ean": item["ean"],
 		# Informational only, so a long item code is cut rather than refused.
@@ -38,13 +50,22 @@ def build_offer(item: dict, price: float, eo_id: str, min_days: int, max_days: i
 		"onHoldByRetailer": False,
 		"condition": {"category": "NEW"},
 		"pricing": {"bundlePrices": [{"quantity": 1, "unitPrice": round(price, 2)}]},
-		"fulfilment": {
-			"method": "FBR",
-			"schedule": "MY_DELIVERY_PROMISE",
-			"deliveryPromise": {"minimumDaysToCustomer": min_days, "maximumDaysToCustomer": max_days},
-		},
+		"fulfilment": fulfilment(delivery_time, order_before),
 		"stock": stock_body(stock),
 	}
+
+
+def fulfilment(delivery_time: str, order_before: str | None) -> dict:
+	"""bol's own delivery promise (BOL_DELIVERY_PROMISE): bol can withdraw My delivery promise from a seller."""
+	if delivery_time not in DELIVERY_TIMES:
+		raise BolMappingError(f"Unknown delivery time {delivery_time!r}", reason="delivery_time")
+	min_days, max_days = DELIVERY_TIMES[delivery_time]
+	promise = {"minimumDaysToCustomer": min_days, "maximumDaysToCustomer": max_days}
+	if delivery_time == WITHIN_24_HOURS:
+		if order_before not in ORDER_BEFORE_TIMES:
+			raise BolMappingError(f"Unknown order-before time {order_before!r}", reason="order_before")
+		promise["ultimateOrderTime"] = order_before
+	return {"method": "FBR", "schedule": "BOL_DELIVERY_PROMISE", "deliveryPromise": promise}
 
 
 def diff_offer(current: dict, desired: dict) -> dict:

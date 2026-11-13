@@ -3,6 +3,7 @@
 # Conventions: fieldnames start with `bol_`; bol identifiers are `read_only` and `no_copy`
 # (and `unique` where they are a natural key).
 
+from marketplace_integrations.bol.mappers.offer import DELIVERY_TIMES, ORDER_BEFORE_TIMES, WITHIN_24_HOURS
 from marketplace_integrations.bol.mappers.returns import HANDLING_RESULTS
 from marketplace_integrations.bol.mappers.shipment import TRANSPORTER_CODES
 
@@ -73,27 +74,28 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"no_copy": 1,
 		},
 		{
-			"fieldname": "bol_min_days",
-			"fieldtype": "Int",
-			"label": "bol Min Days to Customer",
-			"description": "0 = default from Bol Settings.",
+			"fieldname": "bol_delivery_time",
+			"fieldtype": "Select",
+			"label": "bol Delivery Time",
+			"options": "\n" + "\n".join(DELIVERY_TIMES),
+			"description": "Empty = Default Delivery Time from Bol Settings.",
 			"insert_after": "bol_enabled",
-			"non_negative": 1,
 		},
 		{
-			"fieldname": "bol_max_days",
-			"fieldtype": "Int",
-			"label": "bol Max Days to Customer",
-			"description": "0 = default from Bol Settings.",
-			"insert_after": "bol_min_days",
-			"non_negative": 1,
+			"fieldname": "bol_order_before",
+			"fieldtype": "Select",
+			"label": "bol If Ordered Before",
+			"options": "\n" + "\n".join(ORDER_BEFORE_TIMES),
+			"insert_after": "bol_delivery_time",
+			"depends_on": f"eval:doc.bol_delivery_time=='{WITHIN_24_HOURS}'",
+			"mandatory_depends_on": f"eval:doc.bol_delivery_time=='{WITHIN_24_HOURS}'",
 		},
 		{
 			"fieldname": "bol_stock_buffer",
 			"fieldtype": "Int",
 			"label": "bol Stock Buffer",
 			"description": "Units kept back from bol. 0 = default from Bol Settings.",
-			"insert_after": "bol_max_days",
+			"insert_after": "bol_order_before",
 			"non_negative": 1,
 		},
 		{"fieldname": "bol_column", "fieldtype": "Column Break", "insert_after": "bol_stock_buffer"},

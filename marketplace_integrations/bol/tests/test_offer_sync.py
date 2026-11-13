@@ -110,7 +110,7 @@ class FakeBol:
 
 
 def desired_offer(item_code: str, ean: str, price: float = 9.99) -> dict:
-	"""What sync_offer would send for a test item (Settings days 1–2, the test brand's operator)."""
+	"""What sync_offer would send for a test item (Settings 1-2 working days, the test brand's operator)."""
 	return {
 		"reference": item_code,
 		"economicOperatorId": OPERATOR_ID,
@@ -118,7 +118,7 @@ def desired_offer(item_code: str, ean: str, price: float = 9.99) -> dict:
 		"pricing": {"bundlePrices": [{"quantity": 1, "unitPrice": price}]},
 		"fulfilment": {
 			"method": "FBR",
-			"schedule": "MY_DELIVERY_PROMISE",
+			"schedule": "BOL_DELIVERY_PROMISE",
 			"deliveryPromise": {"minimumDaysToCustomer": 1, "maximumDaysToCustomer": 2},
 		},
 		"stock": {"amount": 0, "managedByRetailer": False},
@@ -130,7 +130,11 @@ class OfferSyncTestCase(FrappeTestCase):
 		self.bol = FakeBol()
 		self._start(patch.object(offers, "get_client", return_value=self.bol))
 		self.settings = frappe._dict(
-			enabled=1, sync_offers=1, price_list=TEST_PRICE_LIST, default_min_days=1, default_max_days=2
+			enabled=1,
+			sync_offers=1,
+			price_list=TEST_PRICE_LIST,
+			default_delivery_time="1-2 working days",
+			default_order_before=None,
 		)
 		self._start(patch.object(offers, "_settings", return_value=self.settings))
 		self.enqueued = self._start(patch.object(offers, "enqueue_sync"))
@@ -452,18 +456,51 @@ class TestSyncOffer(OfferSyncTestCase):
 			self._status("_Test bol sync reasons"), ("Not for sale", "NL: Price too high (4000-1)")
 		)
 
-	def test_item_days_override_the_settings(self):
+	def test_item_delivery_time_overrides_the_settings(self):
 		offer_id = self._synced("_Test bol sync days")
-		frappe.db.set_value("Item", "_Test bol sync days", {"bol_min_days": 2, "bol_max_days": 4})
+		frappe.db.set_value(
+			"Item",
+			"_Test bol sync days",
+			{"bol_delivery_time": "Within 24 hours", "bol_order_before": "18:00"},
+		)
 
 		offers.sync_offer("_Test bol sync days")
 
 		patch_body = self.bol.writes()[0][2]
 		self.assertEqual(
-			patch_body["fulfilment"]["deliveryPromise"],
-			{"minimumDaysToCustomer": 2, "maximumDaysToCustomer": 4},
+			patch_body["fulfilment"],
+			{
+				"method": "FBR",
+				"schedule": "BOL_DELIVERY_PROMISE",
+				"deliveryPromise": {
+					"minimumDaysToCustomer": 0,
+					"maximumDaysToCustomer": 1,
+					"ultimateOrderTime": "18:00",
+				},
+			},
 		)
 		self.assertEqual(self.bol.offers[offer_id]["pricing"]["bundlePrices"][0]["unitPrice"], 9.99)
+
+	def test_settings_order_time_comes_with_the_settings_delivery_time(self):
+		self.settings.update(default_delivery_time="Within 24 hours", default_order_before="22:00")
+		# The Item's own time is used only with its own delivery time.
+		self._item("_Test bol sync default 24h", bol_order_before="13:00")
+
+		offers.sync_offer("_Test bol sync default 24h")
+
+		promise = self.bol.writes()[0][2]["fulfilment"]["deliveryPromise"]
+		self.assertEqual(promise["ultimateOrderTime"], "22:00")
+
+	def test_missing_delivery_time_is_not_synced(self):
+		self.settings.default_delivery_time = None
+		self._item("_Test bol sync no time")
+
+		offers.sync_offer("_Test bol sync no time")
+
+		self.assertEqual(self.bol.writes(), [])
+		status, detail = self._status("_Test bol sync no time")
+		self.assertEqual(status, "Not synced")
+		self.assertIn("Default Delivery Time", detail)
 
 	def test_feature_toggle_off(self):
 		self._item("_Test bol sync toggle")
@@ -482,7 +519,7 @@ class TestTriggers(OfferSyncTestCase):
 
 	def test_relevant_item_change(self):
 		item = self._item("_Test bol trigger change")
-		for field, value in (("disabled", 1), ("bol_max_days", 5), ("bol_enabled", 0)):
+		for field, value in (("disabled", 1), ("bol_delivery_time", "3-5 working days"), ("bol_enabled", 0)):
 			with self.subTest(field=field):
 				self.enqueued.reset_mock()
 				item.set(field, value)

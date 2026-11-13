@@ -4,7 +4,7 @@
 import frappe
 from erpnext.stock.get_item_details import get_item_price
 from frappe import _
-from frappe.utils import cint, flt, nowdate
+from frappe.utils import flt, nowdate
 from frappe.utils.background_jobs import is_job_enqueued
 
 from marketplace_integrations.bol.api.client import get_client
@@ -47,7 +47,7 @@ RECONCILE_SAVEPOINT = "bol_reconcile_offer"
 NOT_SYNCED = "Not synced"
 DELETED = "Deleted"
 # Item fields that change what the offer at bol should look like.
-TRIGGER_FIELDS = ("bol_enabled", "disabled", "bol_min_days", "bol_max_days", "brand")
+TRIGGER_FIELDS = ("bol_enabled", "disabled", "bol_delivery_time", "bol_order_before", "brand")
 
 
 def enqueue_adoption() -> bool:
@@ -361,20 +361,26 @@ def _desired(item, settings, stock: int = 0) -> dict:
 		raise BolMappingError(
 			_("{0} has no Brand with a bol economic operator.").format(item.name), reason="no_operator"
 		)
-	# 0 on the Item means "use the Settings default" (ADR-007).
-	min_days = cint(item.bol_min_days) or cint(settings.default_min_days)
-	max_days = cint(item.bol_max_days) or cint(settings.default_max_days)
+	# No delivery time on the Item means "use the Settings one", with its If Ordered Before (ADR-018).
+	if item.bol_delivery_time:
+		delivery_time, order_before = item.bol_delivery_time, item.bol_order_before
+	else:
+		delivery_time, order_before = settings.default_delivery_time, settings.default_order_before
 	try:
 		# Only a create sends the stock; after that the stock sync owns it (diff_offer never compares it).
 		return build_offer(
-			{"item_code": item.name, "ean": ean}, price, operator_id, min_days, max_days, stock
+			{"item_code": item.name, "ean": ean}, price, operator_id, delivery_time, order_before, stock
 		)
 	except BolMappingError as e:
 		if e.reason == "price_range":
 			message = _("The price {0} of {1} is outside bol's range of 1 to 9999.").format(price, item.name)
+		elif e.reason == "order_before":
+			message = _("Set If Ordered Before for the delivery time {0} of {1}.").format(
+				_(delivery_time), item.name
+			)
 		else:
-			message = _("Min Days to Customer ({0}) is more than Max Days to Customer ({1}) for {2}.").format(
-				min_days, max_days, item.name
+			message = _("Set a Default Delivery Time in Bol Settings, or a bol Delivery Time on {0}.").format(
+				item.name
 			)
 		raise BolMappingError(message, reason=e.reason) from e
 

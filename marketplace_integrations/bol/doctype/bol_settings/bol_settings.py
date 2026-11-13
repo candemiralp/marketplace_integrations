@@ -4,13 +4,13 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint
 
 from marketplace_integrations.bol.api.auth import invalidate_token
 from marketplace_integrations.bol.api.client import BolClient
 from marketplace_integrations.bol.api.errors import BolAuthError, BolError
 from marketplace_integrations.bol.log import log_call
 from marketplace_integrations.bol.mappers.bol_invoice import SETTLED_TYPES
+from marketplace_integrations.bol.mappers.offer import WITHIN_24_HOURS
 from marketplace_integrations.bol.offers import enqueue_adoption
 from marketplace_integrations.bol.permissions import check_bol_role
 
@@ -22,7 +22,7 @@ class BolSettings(Document):
 	# Saving never calls bol; only the Test Connection button does.
 
 	def validate(self):
-		self.validate_delivery_days()
+		self.validate_delivery_time()
 		self.validate_offer_sync()
 		self.validate_stock_sync()
 		self.validate_order_import()
@@ -38,24 +38,20 @@ class BolSettings(Document):
 				title=_("Missing Settings"),
 			)
 
-	def validate_delivery_days(self):
-		min_days, max_days = cint(self.default_min_days), cint(self.default_max_days)
-		if min_days < 0 or max_days < 0:
-			frappe.throw(_("Delivery days can't be negative."))
-		if max_days and min_days > max_days:
+	def validate_delivery_time(self):
+		if self.default_delivery_time == WITHIN_24_HOURS and not self.default_order_before:
 			frappe.throw(
-				_(
-					"Default Min Days to Customer ({0}) can't be more than Default Max Days to Customer ({1})."
-				).format(min_days, max_days)
+				_("Set If Ordered Before for the delivery time {0}.").format(_(WITHIN_24_HOURS)),
+				title=_("Missing Settings"),
 			)
 
 	def validate_offer_sync(self):
 		if not self.sync_offers:
 			return
-		if not cint(self.default_max_days):
-			# Otherwise items without their own days would promise delivery on the day of the order.
+		if not self.default_delivery_time:
+			# Otherwise items without their own delivery time couldn't be offered.
 			frappe.throw(
-				_("Set Default Max Days to Customer before switching on Sync Offers."),
+				_("Set a Default Delivery Time before switching on Sync Offers."),
 				title=_("Missing Settings"),
 			)
 		if not self.price_list:
