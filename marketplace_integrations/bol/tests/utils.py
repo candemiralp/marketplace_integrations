@@ -222,24 +222,25 @@ def _make_company():
 			}
 		).insert()
 		make_tax_template(title, account.name)
-	if not frappe.db.exists("Customer Group", TEST_CUSTOMER_GROUP):
-		# Without a group of its own the Customer gets the site default, which ERPNext's before_tests
-		# (run in CI) sets to the root group: a Customer can't be in a group node.
-		frappe.get_doc(
-			{
-				"doctype": "Customer Group",
-				"customer_group_name": TEST_CUSTOMER_GROUP,
-				"parent_customer_group": get_root_of("Customer Group"),
-			}
-		).insert()
 	frappe.get_doc(
 		{
 			"doctype": "Customer",
 			"customer_name": TEST_CUSTOMER,
 			"customer_type": "Company",
-			"customer_group": TEST_CUSTOMER_GROUP,
+			"customer_group": _make_leaf_group("Customer Group", TEST_CUSTOMER_GROUP),
 		}
 	).insert()
+
+
+def _make_leaf_group(doctype: str, name: str) -> str:
+	"""A Customer or Supplier Group that isn't a group node. ERPNext refuses a party in a group node,
+	such as the root that ERPNext's before_tests (run in CI) makes the default."""
+	if not frappe.db.exists(doctype, name):
+		field = frappe.scrub(doctype)
+		frappe.get_doc(
+			{"doctype": doctype, f"{field}_name": name, f"parent_{field}": get_root_of(doctype)}
+		).insert()
+	return name
 
 
 def make_tax_template(title: str, account: str, included: int = 1, company: str = TEST_COMPANY):
@@ -263,6 +264,7 @@ def make_tax_template(title: str, account: str, included: int = 1, company: str 
 
 # Accounting masters (story 12), in the caller's transaction.
 TEST_SUPPLIER = "_Test bol.com Supplier"
+TEST_SUPPLIER_GROUP = "_Test bol Supplier Group"
 TEST_RECEIVABLE = f"_Test Debtors bol - {TEST_COMPANY_ABBR}"
 TEST_PURCHASE_TEMPLATE = f"_Test bol Input VAT - {TEST_COMPANY_ABBR}"
 COMMISSION_ACCOUNT = f"Commission on Sales - {TEST_COMPANY_ABBR}"
@@ -289,13 +291,10 @@ def make_accounting_masters() -> frappe._dict:
 				"account_type": "Receivable",
 			}
 		).insert()
-	if not frappe.db.exists("Supplier Group", "All Supplier Groups"):
-		frappe.get_doc(
-			{"doctype": "Supplier Group", "supplier_group_name": "All Supplier Groups", "is_group": 1}
-		).insert()
 	if not frappe.db.exists("Supplier", TEST_SUPPLIER):
+		group = _make_leaf_group("Supplier Group", TEST_SUPPLIER_GROUP)
 		frappe.get_doc(
-			{"doctype": "Supplier", "supplier_name": TEST_SUPPLIER, "supplier_group": "All Supplier Groups"}
+			{"doctype": "Supplier", "supplier_name": TEST_SUPPLIER, "supplier_group": group}
 		).insert()
 	if not frappe.db.exists("Purchase Taxes and Charges Template", TEST_PURCHASE_TEMPLATE):
 		frappe.get_doc(
