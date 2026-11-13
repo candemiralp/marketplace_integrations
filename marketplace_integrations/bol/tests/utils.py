@@ -4,6 +4,7 @@ import json
 
 import frappe
 import requests
+from frappe.utils.nestedset import get_root_of
 from requests.structures import CaseInsensitiveDict
 
 from marketplace_integrations.bol.api.auth import TOKEN_URL
@@ -168,6 +169,7 @@ def make_warehouse(name: str = TEST_WAREHOUSE, is_group: int = 0) -> str:
 TEST_COMPANY = "_Test bol Company"
 TEST_COMPANY_ABBR = "TBOL"
 TEST_CUSTOMER = "_Test bol Customer"
+TEST_CUSTOMER_GROUP = "_Test bol Customer Group"
 TAX_TEMPLATE_TITLES = {"NL": "_Test bol VAT NL incl", "BE": "_Test bol VAT BE incl"}
 
 
@@ -220,8 +222,23 @@ def _make_company():
 			}
 		).insert()
 		make_tax_template(title, account.name)
+	if not frappe.db.exists("Customer Group", TEST_CUSTOMER_GROUP):
+		# Without a group of its own the Customer gets the site default, which ERPNext's before_tests
+		# (run in CI) sets to the root group: a Customer can't be in a group node.
+		frappe.get_doc(
+			{
+				"doctype": "Customer Group",
+				"customer_group_name": TEST_CUSTOMER_GROUP,
+				"parent_customer_group": get_root_of("Customer Group"),
+			}
+		).insert()
 	frappe.get_doc(
-		{"doctype": "Customer", "customer_name": TEST_CUSTOMER, "customer_type": "Company"}
+		{
+			"doctype": "Customer",
+			"customer_name": TEST_CUSTOMER,
+			"customer_type": "Company",
+			"customer_group": TEST_CUSTOMER_GROUP,
+		}
 	).insert()
 
 
