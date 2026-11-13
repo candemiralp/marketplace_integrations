@@ -106,6 +106,9 @@ jobs:
         working-directory: /home/runner/frappe-bench
         run: |
           bench --site test_site set-config allow_tests true
+          # A fresh site skipped ERPNext's setup wizard: without it, ERPNext's Company test records fail
+          # (e.g. "Could not find Warehouse Type: Transit"). ERPNext runs this before its own tests.
+          bench --site test_site execute erpnext.setup.utils.before_tests
           bench --site test_site run-tests --app marketplace_integrations
         env:
           TYPE: server
