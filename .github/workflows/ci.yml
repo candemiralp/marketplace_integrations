@@ -7,6 +7,9 @@ on:
       - develop
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: develop-marketplace_integrations-${{ github.event.number }}
   cancel-in-progress: true
