@@ -8,6 +8,7 @@ from frappe.tests.utils import FrappeTestCase
 
 from marketplace_integrations.bol.api.errors import BolAuthError, BolTransientError
 from marketplace_integrations.bol.doctype.bol_settings import bol_settings
+from marketplace_integrations.bol.mappers.offer import DELIVERY_TIMES, ORDER_BEFORE_TIMES
 from marketplace_integrations.bol.tests.utils import (
 	TEST_COMPANY_ABBR,
 	make_accounting_masters,
@@ -117,8 +118,7 @@ class TestOfferSyncSettings(FrappeTestCase):
 				"enabled": 0,
 				"sync_offers": 1,
 				"price_list": make_price_list(),
-				"default_min_days": 1,
-				"default_max_days": 2,
+				"default_delivery_time": "1-2 working days",
 				**values,
 			}
 		)
@@ -128,15 +128,26 @@ class TestOfferSyncSettings(FrappeTestCase):
 		self._settings().validate()
 
 	def test_off_needs_nothing(self):
-		self._settings(sync_offers=0, price_list=None, default_max_days=0).validate()
+		self._settings(sync_offers=0, price_list=None, default_delivery_time=None).validate()
 
 	def test_needs_a_price_list(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Price List"):
 			self._settings(price_list=None).validate()
 
-	def test_needs_default_max_days(self):
-		with self.assertRaisesRegex(frappe.ValidationError, "Max Days"):
-			self._settings(default_min_days=0, default_max_days=0).validate()
+	def test_needs_a_default_delivery_time(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Default Delivery Time"):
+			self._settings(default_delivery_time=None).validate()
+
+	def test_within_24_hours_needs_an_order_time(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "If Ordered Before"):
+			self._settings(default_delivery_time="Within 24 hours", default_order_before=None).validate()
+		self._settings(default_delivery_time="Within 24 hours", default_order_before="22:00").validate()
+
+	def test_dropdowns_match_the_mapper(self):
+		# The DocType JSON can't import the mapper's lists; the Item custom fields do.
+		meta = frappe.get_meta("Bol Settings")
+		self.assertEqual(meta.get_options("default_delivery_time").split("\n")[1:], list(DELIVERY_TIMES))
+		self.assertEqual(meta.get_options("default_order_before").split("\n")[1:], list(ORDER_BEFORE_TIMES))
 
 	def test_buying_price_list_rejected(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "selling"):
@@ -158,7 +169,7 @@ class TestStockSyncSettings(FrappeTestCase):
 				"enabled": 0,
 				"sync_offers": 1,
 				"price_list": make_price_list(),
-				"default_max_days": 2,
+				"default_delivery_time": "1-2 working days",
 				"sync_stock": 1,
 				"warehouse": make_warehouse(),
 				"stock_buffer": 1,

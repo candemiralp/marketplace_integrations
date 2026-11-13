@@ -5,8 +5,10 @@ Design: [ADR-007](../decisions.md#adr-007--catalog-mapping-economic-operators-ad
 1. **Economic operator per Brand.** Create the operators in the bol seller dashboard. On each Brand,
    click **Select bol economic operator** (System Manager / Bol Manager) and pick one. If bol hasn't
    marked the operator `VALID` yet, it's saved anyway, but offers linked to it won't be published.
-2. **Delivery promise.** Set *Default Min/Max Days to Customer* in Bol Settings. An Item can override
-   them in its *bol.com* section (Sales tab); 0 means "use the default".
+2. **Delivery time.** Pick a *Default Delivery Time* in Bol Settings, the same choices as in the bol
+   seller dashboard. With *Within 24 hours*, also pick *If Ordered Before* (12:00–23:00). An Item can
+   override both in its *bol.com* section (Sales tab); empty means "use the default". See
+   [ADR-018](../decisions.md#adr-018--delivery-times-bols-own-delivery-promise-fix-2026-11-13).
 3. **Mark Items.** Tick **Sell on bol** on the Item. It saves only when the Item is a stock item (not a
    template), has exactly one barcode of type *EAN* with a valid 13-digit GTIN, and its Brand has an
    economic operator. The message lists everything that's missing. While the box is ticked, these

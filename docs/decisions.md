@@ -224,7 +224,7 @@ failure inside the client would also defeat `log_once` (rule 6).
 | Offers v11 list filters `eans, reference, for-sale, page-size, cursor` | Also `offer-ids`, `last-modified-date-time`. `page-size` 1–100. Response `{offers[], page{pageSize, nextCursor}}` | Follow `page.nextCursor` until it's null or empty. |
 | `bol_offer_status` "For sale / Not for sale / On hold" | v11 offers have **no status field**: only `onHoldByRetailer` and `countryAvailabilities[{countryCode, forSale}]` | `mappers/offer.offer_status`: on hold → `On hold`; for sale in any country → `For sale`; else `Not for sale`. |
 | `bol_status_detail` = not-for-sale reasons | Reasons come from a separate `GET /retailer/offers/{id}/not-for-sale-reasons` | Adopting doesn't fetch them (one call per offer). Story 05 fills the detail when it refreshes the status. |
-| Item `bol_min_days`/`bol_max_days`: blank = Settings default | Int custom fields are `NOT NULL DEFAULT 0` | **0 means "use the Settings default"**. A promise of 0 days can still be set in Bol Settings. |
+| Item `bol_min_days`/`bol_max_days`: blank = Settings default | Int custom fields are `NOT NULL DEFAULT 0` | **0 means "use the Settings default"**. A promise of 0 days can still be set in Bol Settings. *Replaced by delivery times, ADR-018.* |
 | Duplicate EAN across Items | ERPNext's `Item Barcode.barcode` is **unique**, so the same string can't be on two Items | A "duplicate" is the same GTIN written differently: UPC-A (12 digits), EAN-13, GTIN-14 (GS1 treats leading zeros as insignificant). Lookup matches all zero-padded forms (`mappers/ean.gtin_forms`); more than one Item → reported as ambiguous. This also matches UPC-A barcodes from Shopify. |
 | `frappe.only_for([...])` | `only_for` lets everyone through when `frappe.flags.in_test` is set (ADR-006) | `bol/permissions.check_bol_role()` checks `frappe.get_roles()`. Bol Process' Retry handler uses it too. |
 | — | The offers spec has no response `example` for the list | Test fixtures are built from the schema's field examples. |
@@ -281,7 +281,7 @@ demo environment.
 |---|---|---|
 | Create returns `offerId` (201) | `POST /retailer/offers` → 201 `RetailerOffer {offerId}`. `CreateOfferRequest` requires `ean, condition, pricing, fulfilment`; `stock` (`CreateStock`) requires `amount, managedByRetailer` | Send `condition: {category: NEW}` and `stock: {amount: 0, managedByRetailer: false}` (story 06 sets the real stock, with `false` as story 06 decides). A create answer **without `offerId`** counts as ambiguous: the next run's EAN lookup finds the offer. |
 | Update (PATCH) | `PATCH /retailer/offers/{id}` → 204. `PatchOfferRequest`: `economicOperatorId, onHoldByRetailer, reference, countryAvailabilities, pricing, fulfilment, stock, unknownProductTitle`. **`ean` and `condition` can't be patched** | `diff_offer` compares only `economicOperatorId, onHoldByRetailer, reference, pricing, fulfilment`. `stock` belongs to story 06. |
-| Delivery schedule `MY_DELIVERY_PROMISE` / `BOL_DELIVERY_PROMISE` | `fulfilment.schedule` ∈ `BOL_DELIVERY_PROMISE, MY_DELIVERY_PROMISE, SHIPPING_VIA_BOL`; `deliveryPromise {minimumDaysToCustomer, maximumDaysToCustomer, ultimateOrderTime}`. The demo GET **echoes `schedule`** | Send `MY_DELIVERY_PROMISE` + min/max days. `schedule` is compared, so an offer on `BOL_DELIVERY_PROMISE` (e.g. adopted) is switched over. |
+| Delivery schedule `MY_DELIVERY_PROMISE` / `BOL_DELIVERY_PROMISE` | `fulfilment.schedule` ∈ `BOL_DELIVERY_PROMISE, MY_DELIVERY_PROMISE, SHIPPING_VIA_BOL`; `deliveryPromise {minimumDaysToCustomer, maximumDaysToCustomer, ultimateOrderTime}`. The demo GET **echoes `schedule`** | Send `MY_DELIVERY_PROMISE` + min/max days. `schedule` is compared, so an offer on `BOL_DELIVERY_PROMISE` (e.g. adopted) is switched over. *Reversed by ADR-018: `BOL_DELIVERY_PROMISE`.* |
 | `pricing.bundlePrices[]` 1–4, `unitPrice` 1–9999 | Confirmed; the unit price **includes VAT** | One bundle price (quantity 1), rounded to cents. The bol price list must hold VAT-inclusive EUR prices. |
 | `reference` ≤ 100 chars, the item_code | Confirmed. ERPNext item codes can be 140 | Cut to 100 characters: it's informational only. |
 | — | `countryAvailabilities` optional on create | Not sent: bol's default applies. |
@@ -308,7 +308,8 @@ response. On the demo a sync therefore ends in `Not synced` (create without `off
   an Item Price never takes a listing offline in between. A missing price never sends 0.
 - **Price** comes from ERPNext's `get_item_price` (stock UOM, no customer-specific rows, valid today).
 - **Delivery days**: Item value, 0 = Settings default (ADR-007). Settings require *Default Max Days* when
-  *Sync Offers* is on: without it items would promise delivery on the day of the order.
+  *Sync Offers* is on: without it items would promise delivery on the day of the order. *Replaced by
+  delivery times, ADR-018.*
 - **No duplicates.** Before any POST: an EAN already mapped to another item's offer → `Not synced`; then
   `GET ?eans=` adopts an existing offer (several offers for the EAN → `Not synced`). After a successful POST
   the mapping is **committed at once**, so nothing failing afterwards can lose it. An ambiguous POST isn't
@@ -782,3 +783,35 @@ were seen (ADR-010). On production that would be a real anomaly after the cutove
   integration log keep order payloads (ecommerce_integrations purges only Success logs after 90 days).
 - A return Delivery Note or credit note made after the address was anonymized prints `[removed]`: choose N well past
   bol's return window.
+
+---
+
+## ADR-018 — Delivery times: bol's own delivery promise (fix, 2026-11-13)
+
+**Context.** After an offer sync the Partner Platform showed an empty delivery time and *"You are using
+'My delivery promise' but you don't have these rights anymore, please select a different delivery time"*.
+bol grants **My delivery promise** (`MY_DELIVERY_PROMISE`) per seller and can withdraw it. ADR-008 sent it
+on every offer and switched offers on `BOL_DELIVERY_PROMISE` back to it, so picking a delivery time in the
+dashboard was undone by the next sync. Checked against `docs/bol-openapi/offers-v11.yaml` and bol's v11
+use case guide: its `BOL_DELIVERY_PROMISE` examples send `deliveryPromise {minimumDaysToCustomer,
+maximumDaysToCustomer, ultimateOrderTime}`; its `MY_DELIVERY_PROMISE` examples send no days (they come
+from the seller's My delivery promise profile in the dashboard).
+
+| Before | Spec / dashboard says | Decision |
+|---|---|---|
+| Free min/max days (Settings, Item) | The dashboard offers fixed delivery times (v10's `deliveryCode` list without `MijnLeverbelofte` and `VVB`): *Within 24 hours* with *If ordered before* 12:00–23:00, *1-2*, *2-3*, *3-5*, *4-8*, *1-8 working days* | Select fields with the same choices: Bol Settings *Default Delivery Time* / *If Ordered Before*, Item *bol Delivery Time* / *bol If Ordered Before* (empty = Settings). The lists live in `mappers/offer.py` (`DELIVERY_TIMES`, `ORDER_BEFORE_TIMES`); a test checks the DocType JSON against them. |
+| `schedule: MY_DELIVERY_PROMISE` | — | Always `BOL_DELIVERY_PROMISE`, days from the table in `DELIVERY_TIMES` (*Within 24 hours* = 0–1). `ultimateOrderTime` only for *Within 24 hours*. |
+| Item days fell back to Settings one by one | — | The Item's *If Ordered Before* is used only with its own delivery time; without one, both come from Settings. |
+| Settings require *Default Max Days* with *Sync Offers* | — | They require *Default Delivery Time*, and *If Ordered Before* with *Within 24 hours*. Item validation asks for *bol If Ordered Before* with *Within 24 hours*. No delivery time when syncing → `Not synced` with the reason. |
+
+**Migration** (`patches/set_delivery_time.py`). Settings days and Item days (0 = Settings, per field) that
+match a delivery time exactly become that delivery time; an Item whose days equal the Settings' gets none.
+Days matching nothing are printed in the migrate output and not guessed (the Item then uses the Settings
+time). 0–1 becomes *Within 24 hours* without an order time: the sync reports `Not synced` until it's set.
+The old Settings values are deleted from `tabSingles`; the Item Custom Fields are deleted (Frappe keeps
+their columns). Checked on `dev.localhost`: Settings 2/3 → *2-3 working days*, an Item 4/8 → *4-8 working days*.
+
+**Not checked live.** The demo answers PATCH with 403 and POST with a canned body (ADR-008), so whether bol
+accepts the multi-day times without `ultimateOrderTime` is first seen on production: a rejection shows as
+`Not synced` with bol's violations on the Item. Changing the Settings time re-syncs offers with the daily
+reconcile, not at once.

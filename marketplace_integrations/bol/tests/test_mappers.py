@@ -9,6 +9,7 @@ from marketplace_integrations.bol.api.errors import BolMappingError
 from marketplace_integrations.bol.mappers.ean import get_item_ean, gtin_forms, is_valid_gtin13
 from marketplace_integrations.bol.mappers.offer import (
 	HOLD,
+	ORDER_BEFORE_TIMES,
 	build_offer,
 	diff_offer,
 	format_not_for_sale_reasons,
@@ -109,8 +110,8 @@ def offer(**overrides) -> dict:
 			"item": SHIRT,
 			"price": 9.99,
 			"eo_id": OPERATOR,
-			"min_days": 1,
-			"max_days": 2,
+			"delivery_time": "1-2 working days",
+			"order_before": None,
 			"stock": 0,
 			**overrides,
 		}
@@ -130,12 +131,37 @@ class TestBuildOffer(unittest.TestCase):
 				"pricing": {"bundlePrices": [{"quantity": 1, "unitPrice": 9.99}]},
 				"fulfilment": {
 					"method": "FBR",
-					"schedule": "MY_DELIVERY_PROMISE",
+					"schedule": "BOL_DELIVERY_PROMISE",
 					"deliveryPromise": {"minimumDaysToCustomer": 1, "maximumDaysToCustomer": 2},
 				},
 				"stock": {"amount": 0, "managedByRetailer": False},
 			},
 		)
+
+	def test_delivery_times(self):
+		for delivery_time, (min_days, max_days) in (
+			("1-2 working days", (1, 2)),
+			("2-3 working days", (2, 3)),
+			("3-5 working days", (3, 5)),
+			("4-8 working days", (4, 8)),
+			("1-8 working days", (1, 8)),
+		):
+			with self.subTest(delivery_time=delivery_time):
+				# An If Ordered Before left over from Within 24 hours isn't sent.
+				fulfilment = offer(delivery_time=delivery_time, order_before="22:00")["fulfilment"]
+				expected = {"minimumDaysToCustomer": min_days, "maximumDaysToCustomer": max_days}
+				self.assertEqual(fulfilment["deliveryPromise"], expected)
+
+	def test_within_24_hours_sends_the_order_time(self):
+		self.assertEqual(
+			offer(delivery_time="Within 24 hours", order_before="22:00")["fulfilment"]["deliveryPromise"],
+			{"minimumDaysToCustomer": 0, "maximumDaysToCustomer": 1, "ultimateOrderTime": "22:00"},
+		)
+
+	def test_order_before_times(self):
+		self.assertEqual(ORDER_BEFORE_TIMES[0], "12:00")
+		self.assertEqual(ORDER_BEFORE_TIMES[-1], "23:00")
+		self.assertEqual(len(ORDER_BEFORE_TIMES), 12)
 
 	def test_one_bundle_price_rounded_to_cents(self):
 		self.assertEqual(
@@ -152,10 +178,17 @@ class TestBuildOffer(unittest.TestCase):
 				offer(price=price)
 			self.assertEqual(ctx.exception.reason, "price_range")
 
-	def test_min_days_above_max_days(self):
-		with self.assertRaises(BolMappingError) as ctx:
-			offer(min_days=3, max_days=2)
-		self.assertEqual(ctx.exception.reason, "delivery_days")
+	def test_unknown_delivery_time(self):
+		for delivery_time in (None, "", "2-4 working days", "My delivery promise"):
+			with self.subTest(delivery_time=delivery_time), self.assertRaises(BolMappingError) as ctx:
+				offer(delivery_time=delivery_time)
+			self.assertEqual(ctx.exception.reason, "delivery_time")
+
+	def test_within_24_hours_needs_an_order_time(self):
+		for order_before in (None, "", "11:00", "24:00"):
+			with self.subTest(order_before=order_before), self.assertRaises(BolMappingError) as ctx:
+				offer(delivery_time="Within 24 hours", order_before=order_before)
+			self.assertEqual(ctx.exception.reason, "order_before")
 
 	def test_long_item_code_is_cut_to_bols_reference_limit(self):
 		self.assertEqual(offer(item={**SHIRT, "item_code": "X" * 140})["reference"], "X" * 100)
@@ -171,7 +204,7 @@ class TestDiffOffer(unittest.TestCase):
 			"countryAvailabilities": [{"countryCode": "NL", "forSale": True}],
 			"fulfilment": {
 				"method": "FBR",
-				"schedule": "MY_DELIVERY_PROMISE",
+				"schedule": "BOL_DELIVERY_PROMISE",
 				"profileId": "0c6573a2-a80c-48b7-a03e-d5939f1173f1",
 				"deliveryPromise": {
 					"minimumDaysToCustomer": 1,
@@ -197,13 +230,29 @@ class TestDiffOffer(unittest.TestCase):
 		self.assertEqual(diff_offer(current, offer(price=10.0)), {})
 
 	def test_changed_operator_and_delivery_promise(self):
-		patch = diff_offer(self.current(economicOperatorId=None), offer(max_days=3))
+		patch = diff_offer(self.current(economicOperatorId=None), offer(delivery_time="2-3 working days"))
 		self.assertEqual(set(patch), {"economicOperatorId", "fulfilment"})
 		self.assertEqual(patch["fulfilment"]["deliveryPromise"]["maximumDaysToCustomer"], 3)
 
-	def test_bol_delivery_promise_is_replaced(self):
-		current = self.current(fulfilment={"method": "FBR", "schedule": "BOL_DELIVERY_PROMISE"})
-		self.assertEqual(set(diff_offer(current, offer())), {"fulfilment"})
+	def test_my_delivery_promise_is_replaced(self):
+		# bol can withdraw My delivery promise from a seller: the offer then shows no delivery time.
+		current = self.current(
+			fulfilment={
+				"method": "FBR",
+				"schedule": "MY_DELIVERY_PROMISE",
+				"deliveryPromise": {"minimumDaysToCustomer": 1, "maximumDaysToCustomer": 2},
+			}
+		)
+		patch = diff_offer(current, offer())
+		self.assertEqual(set(patch), {"fulfilment"})
+		self.assertEqual(patch["fulfilment"]["schedule"], "BOL_DELIVERY_PROMISE")
+
+	def test_changed_order_time(self):
+		current = self.current(
+			fulfilment=offer(delivery_time="Within 24 hours", order_before="22:00")["fulfilment"]
+		)
+		patch = diff_offer(current, offer(delivery_time="Within 24 hours", order_before="18:00"))
+		self.assertEqual(patch["fulfilment"]["deliveryPromise"]["ultimateOrderTime"], "18:00")
 
 	def test_stock_ean_and_condition_are_never_patched(self):
 		current = self.current(ean="other", condition={"category": "SECONDHAND"})

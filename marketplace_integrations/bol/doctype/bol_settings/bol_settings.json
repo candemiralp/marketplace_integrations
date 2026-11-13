@@ -16,8 +16,8 @@
   "sync_offers",
   "price_list",
   "offers_column",
-  "default_min_days",
-  "default_max_days",
+  "default_delivery_time",
+  "default_order_before",
   "stock_section",
   "sync_stock",
   "warehouse",
@@ -134,16 +134,21 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Delivery promise for items that don't set their own (bol Min Days on the Item).",
-   "fieldname": "default_min_days",
-   "fieldtype": "Int",
-   "label": "Default Min Days to Customer"
+   "description": "bol's delivery promise for items that don't set their own (bol Delivery Time on the Item), as in the bol seller dashboard.",
+   "fieldname": "default_delivery_time",
+   "fieldtype": "Select",
+   "label": "Default Delivery Time",
+   "mandatory_depends_on": "eval:doc.sync_offers",
+   "options": "\nWithin 24 hours\n1-2 working days\n2-3 working days\n3-5 working days\n4-8 working days\n1-8 working days"
   },
   {
-   "description": "Delivery promise for items that don't set their own (bol Max Days on the Item).",
-   "fieldname": "default_max_days",
-   "fieldtype": "Int",
-   "label": "Default Max Days to Customer"
+   "depends_on": "eval:doc.default_delivery_time=='Within 24 hours'",
+   "description": "Orders placed before this time are delivered the next day.",
+   "fieldname": "default_order_before",
+   "fieldtype": "Select",
+   "label": "If Ordered Before",
+   "mandatory_depends_on": "eval:doc.default_delivery_time=='Within 24 hours'",
+   "options": "\n12:00\n13:00\n14:00\n15:00\n16:00\n17:00\n18:00\n19:00\n20:00\n21:00\n22:00\n23:00"
   },
   {
    "fieldname": "stock_section",
@@ -447,7 +452,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-12 09:00:00.000000",
+ "modified": "2026-11-13 11:50:21.531194",
  "modified_by": "Administrator",
  "module": "Bol",
  "name": "Bol Settings",

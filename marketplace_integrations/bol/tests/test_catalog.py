@@ -39,7 +39,7 @@ class TestItemValidation(CatalogTestCase):
 		return str(ctx.exception)
 
 	def test_publishable_item_saves(self):
-		item = make_item("_Test bol ok", EAN, bol_enabled=1, bol_min_days=1, bol_max_days=2)
+		item = make_item("_Test bol ok", EAN, bol_enabled=1, bol_delivery_time="2-3 working days")
 		self.assertEqual(item.bol_enabled, 1)
 
 	def test_not_bol_enabled_skips_the_checks(self):
@@ -72,9 +72,9 @@ class TestItemValidation(CatalogTestCase):
 		message = self._problems("_Test bol no eo", EAN, brand="_Test bol Brand without operator")
 		self.assertIn("has no bol economic operator", message)
 
-	def test_min_days_above_max_days(self):
-		message = self._problems("_Test bol days", EAN, bol_min_days=3, bol_max_days=1)
-		self.assertIn("can't be more than", message)
+	def test_within_24_hours_needs_an_order_time(self):
+		message = self._problems("_Test bol 24h", EAN, bol_delivery_time="Within 24 hours")
+		self.assertIn("If Ordered Before", message)
 
 	def test_all_problems_are_listed_at_once(self):
 		message = self._problems("_Test bol all", is_stock_item=0, brand=None)
